@@ -1,4 +1,5 @@
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
+import { useState } from 'react';
 import {
   Sparkles,
   BookOpen,
@@ -8,7 +9,8 @@ import {
   Cloud,
   Search,
   ArrowRight,
-  Check
+  Check,
+  LogOut
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
@@ -91,6 +93,15 @@ const pricing = [
 ];
 
 export function LandingPage() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    localStorage.removeItem('authToken');
+    navigate('/');
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Navbar */}
@@ -117,14 +128,27 @@ export function LandingPage() {
             </div>
 
             <div className="flex items-center gap-3">
-              <Link to="/login">
-                <Button variant="ghost">Đăng nhập</Button>
-              </Link>
-              <Link to="/register">
-                <Button className="bg-gradient-to-r from-primary to-secondary">
-                  Bắt đầu miễn phí
+              {isLoggedIn ? (
+                <Button
+                  variant="ghost"
+                  onClick={handleLogout}
+                  className="flex items-center gap-2"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Đăng xuất
                 </Button>
-              </Link>
+              ) : (
+                <>
+                  <Link to="/login">
+                    <Button variant="ghost">Đăng nhập</Button>
+                  </Link>
+                  <Link to="/register">
+                    <Button className="bg-gradient-to-r from-primary to-secondary">
+                      Bắt đầu miễn phí
+                    </Button>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -223,9 +247,8 @@ export function LandingPage() {
             {pricing.map((plan, index) => (
               <Card
                 key={index}
-                className={`border-border/50 relative ${
-                  plan.popular ? 'border-primary shadow-xl scale-105' : ''
-                }`}
+                className={`border-border/50 relative ${plan.popular ? 'border-primary shadow-xl scale-105' : ''
+                  }`}
               >
                 {plan.popular && (
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2">
@@ -248,11 +271,10 @@ export function LandingPage() {
                     ))}
                   </ul>
                   <Button
-                    className={`w-full ${
-                      plan.popular
+                    className={`w-full ${plan.popular
                         ? 'bg-gradient-to-r from-primary to-secondary'
                         : ''
-                    }`}
+                      }`}
                     variant={plan.popular ? 'default' : 'outline'}
                   >
                     Chọn gói {plan.name}

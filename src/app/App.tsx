@@ -21,9 +21,7 @@ import { AuthLayout } from './components/layout/AuthLayout';
 
 export default function App() {
   // Mock authentication state - in production use real auth
-  const [isAuthenticated, setIsAuthenticated] = useState(
-    localStorage.getItem('isAuthenticated') === 'true'
-  );
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // Listen for authentication changes
   useEffect(() => {

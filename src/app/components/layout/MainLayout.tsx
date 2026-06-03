@@ -42,7 +42,7 @@ export function MainLayout() {
     localStorage.removeItem('isAuthenticated');
     // Trigger custom event to update auth state
     window.dispatchEvent(new Event('authChange'));
-    window.location.href = '/login';
+    window.location.href = '/';
   };
 
   return (
@@ -57,9 +57,8 @@ export function MainLayout() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 z-50 h-full w-64 bg-card border-r border-border transition-transform duration-300 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } lg:translate-x-0`}
+        className={`fixed top-0 left-0 z-50 h-full w-64 bg-card border-r border-border transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          } lg:translate-x-0`}
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
@@ -70,7 +69,7 @@ export function MainLayout() {
               </div>
               <span className="font-bold text-lg">AI Study Hub</span>
             </Link>
-            <button className="lg:hidden" onClick={() => setSidebarOpen(false)}>
+            <button className="lg:hidden" onClick={() => setSidebarOpen(false)} title="Đóng menu">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -83,11 +82,10 @@ export function MainLayout() {
                 <Link
                   key={item.name}
                   to={item.href}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                    isActive
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                  }`}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                    }`}
                   onClick={() => setSidebarOpen(false)}
                 >
                   <item.icon className="w-5 h-5" />
@@ -147,6 +145,7 @@ export function MainLayout() {
             <button
               className="lg:hidden"
               onClick={() => setSidebarOpen(true)}
+              title="Mở menu"
             >
               <Menu className="w-6 h-6" />
             </button>
@@ -161,6 +160,17 @@ export function MainLayout() {
             >
               <Sun className="w-5 h-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
               <Moon className="absolute w-5 h-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            </Button>
+
+            {/* Logout Button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              className="flex items-center gap-2 ml-2"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="hidden md:inline">Đăng xuất</span>
             </Button>
           </div>
         </header>
