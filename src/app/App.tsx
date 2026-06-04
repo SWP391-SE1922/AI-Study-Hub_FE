@@ -65,7 +65,7 @@ export default function App() {
             <Route path="/documents/:id" element={isAuthenticated ? <DocumentDetailPage /> : <Navigate to="/login" />} />
             <Route path="/ai-chat" element={isAuthenticated ? <AIChat /> : <Navigate to="/login" />} />
             <Route path="/admin" element={isAuthenticated ? <AdminPage /> : <Navigate to="/login" />} />
-            <Route path="/profile" element={isAuthenticated ? <ProfilePage /> : <Navigate to="/login" />} />
+            <Route path="/profile" element={<ProfilePage />} />
           </Route>
         </Routes>
         <Toaster />

@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 export function ProfilePage() {
   const [formData, setFormData] = useState({
     name: 'Sinh viên',
-    email: 'student@example.com',
+    email: 'student@gmail.com',
     phone: '0123456789',
     studentId: 'SV001'
   });
