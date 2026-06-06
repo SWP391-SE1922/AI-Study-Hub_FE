@@ -95,44 +95,45 @@ export function AIChat() {
   };
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex gap-6">
+    <div className="h-[calc(100vh-8rem)] flex gap-6 text-slate-700">
       {/* Chat History Sidebar */}
       <div className="hidden lg:block w-64 flex-shrink-0">
-        <Card className="h-full border-border/50">
+        <Card className="h-full border-slate-200 bg-white rounded-2xl shadow-sm">
           <CardContent className="p-4">
-            <Button className="w-full mb-4 bg-gradient-to-r from-primary to-secondary">
+            <Button className="w-full mb-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-xl font-medium">
               <Plus className="w-4 h-4 mr-2" />
               Chat mới
             </Button>
 
             <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-muted-foreground mb-3">Lịch sử chat</h3>
-              <button className="w-full text-left p-3 rounded-lg hover:bg-muted transition-colors border border-primary">
-                <div className="flex items-start gap-2">
-                  <History className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+              <h3 className="text-xs font-bold text-slate-400 tracking-wider uppercase mb-3">Lịch sử chat</h3>
+
+              <button className="w-full text-left p-3 rounded-xl hover:bg-slate-50 transition-colors border border-indigo-100 bg-indigo-50/30">
+                <div className="flex items-start gap-2.5">
+                  <History className="w-4 h-4 text-indigo-600 mt-0.5 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">Chat hiện tại</p>
-                    <p className="text-xs text-muted-foreground">Hôm nay</p>
+                    <p className="text-sm font-semibold text-slate-800 truncate">Chat hiện tại</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Hôm nay</p>
                   </div>
                 </div>
               </button>
 
-              <button className="w-full text-left p-3 rounded-lg hover:bg-muted transition-colors">
-                <div className="flex items-start gap-2">
-                  <History className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+              <button className="w-full text-left p-3 rounded-xl hover:bg-slate-50 transition-colors border border-transparent">
+                <div className="flex items-start gap-2.5">
+                  <History className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm truncate">Giải thích cấu trúc dữ...</p>
-                    <p className="text-xs text-muted-foreground">Hôm qua</p>
+                    <p className="text-sm font-medium text-slate-600 truncate">Giải thích cấu trúc dữ...</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Hôm qua</p>
                   </div>
                 </div>
               </button>
 
-              <button className="w-full text-left p-3 rounded-lg hover:bg-muted transition-colors">
-                <div className="flex items-start gap-2">
-                  <History className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+              <button className="w-full text-left p-3 rounded-xl hover:bg-slate-50 transition-colors border border-transparent">
+                <div className="flex items-start gap-2.5">
+                  <History className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm truncate">Bài tập Toán cao cấp</p>
-                    <p className="text-xs text-muted-foreground">2 ngày trước</p>
+                    <p className="text-sm font-medium text-slate-600 truncate">Bài tập Toán cao cấp</p>
+                    <p className="text-xs text-slate-400 mt-0.5">2 ngày trước</p>
                   </div>
                 </div>
               </button>
@@ -143,56 +144,61 @@ export function AIChat() {
 
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col min-w-0">
-        <Card className="flex-1 border-border/50 flex flex-col">
+        <Card className="flex-1 border-slate-200 bg-white rounded-2xl shadow-sm flex flex-col overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-border">
+          <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50/50">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center">
+              <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-sm">
                 <Sparkles className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h2 className="font-semibold">AI Study Assistant</h2>
-                <p className="text-xs text-muted-foreground">Trợ lý học tập thông minh</p>
+                <h2 className="font-bold text-slate-800 leading-tight">AI Study Assistant</h2>
+                <p className="text-xs text-slate-400 mt-0.5">Trợ lý học tập thông minh</p>
               </div>
             </div>
 
-            <Button variant="ghost" size="icon" onClick={handleClearChat}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleClearChat}
+              className="w-9 h-9 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50"
+              aria-label="Xóa toàn bộ cuộc trò chuyện"
+            >
               <Trash2 className="w-4 h-4" />
             </Button>
           </div>
 
           {/* Messages */}
-          <ScrollArea className="flex-1 p-4" ref={scrollRef}>
-            <div className="space-y-6 max-w-3xl mx-auto">
+          <ScrollArea className="flex-1 p-4 bg-slate-50/30" ref={scrollRef}>
+            <div className="space-y-6 max-w-3xl mx-auto py-2">
               {messages.map((message) => (
                 <div
                   key={message.id}
-                  className={`flex gap-4 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  className={`flex gap-3.5 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   {message.role === 'assistant' && (
-                    <Avatar className="w-8 h-8 flex-shrink-0">
-                      <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-white">
-                        <Sparkles className="w-4 h-4" />
+                    <Avatar className="w-8 h-8 flex-shrink-0 border border-slate-100 shadow-sm">
+                      <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white">
+                        <Sparkles className="w-3.5 h-3.5" />
                       </AvatarFallback>
                     </Avatar>
                   )}
 
                   <div
-                    className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                      message.role === 'user'
-                        ? 'bg-gradient-to-br from-primary to-secondary text-white'
-                        : 'bg-muted'
-                    }`}
+                    className={`max-w-[80%] rounded-2xl px-4 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.02)] ${message.role === 'user'
+                        ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-medium'
+                        : 'bg-white border border-slate-150 text-slate-800'
+                      }`}
                   >
-                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                    <p className={`text-xs mt-2 ${message.role === 'user' ? 'text-white/70' : 'text-muted-foreground'}`}>
+                    <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                    <p className={`text-[10px] mt-1.5 font-medium ${message.role === 'user' ? 'text-indigo-100/80' : 'text-slate-400'}`}>
                       {message.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
 
                   {message.role === 'user' && (
-                    <Avatar className="w-8 h-8 flex-shrink-0">
-                      <AvatarFallback className="bg-primary text-primary-foreground">
+                    <Avatar className="w-8 h-8 flex-shrink-0 border border-indigo-100 shadow-sm">
+                      <AvatarFallback className="bg-indigo-50 text-indigo-700 font-bold text-xs">
                         SV
                       </AvatarFallback>
                     </Avatar>
@@ -202,38 +208,38 @@ export function AIChat() {
 
               {/* Typing Indicator */}
               {isTyping && (
-                <div className="flex gap-4">
-                  <Avatar className="w-8 h-8 flex-shrink-0">
-                    <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-white">
-                      <Sparkles className="w-4 h-4" />
+                <div className="flex gap-3.5">
+                  <Avatar className="w-8 h-8 flex-shrink-0 border border-slate-100 shadow-sm">
+                    <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white">
+                      <Sparkles className="w-3.5 h-3.5" />
                     </AvatarFallback>
                   </Avatar>
-                  <div className="bg-muted rounded-2xl px-4 py-3">
-                    <div className="flex gap-1">
-                      <div className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <div className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <div className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  <div className="bg-white border border-slate-150 rounded-2xl px-4 py-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+                    <div className="flex gap-1.5 items-center h-2">
+                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" />
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Suggested Prompts (show when no user messages) */}
+              {/* Suggested Prompts */}
               {messages.length === 1 && (
-                <div className="space-y-4 mt-8">
-                  <h3 className="text-sm font-semibold text-center text-muted-foreground">
-                    Gợi ý câu hỏi
+                <div className="space-y-4 mt-12 max-w-2xl mx-auto">
+                  <h3 className="text-xs font-bold text-center text-slate-400 tracking-wider uppercase">
+                    Gợi ý câu hỏi trợ giúp học tập
                   </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {suggestedPrompts.map((prompt, index) => (
                       <button
                         key={index}
                         onClick={() => handleSend(prompt)}
-                        className="p-4 bg-muted hover:bg-muted/80 rounded-xl text-left transition-colors border border-border hover:border-primary"
+                        className="p-4 bg-white hover:bg-indigo-50/20 rounded-xl text-left transition-all border border-slate-200/80 hover:border-indigo-500 hover:shadow-sm group"
                       >
                         <div className="flex items-start gap-3">
-                          <FileText className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                          <p className="text-sm">{prompt}</p>
+                          <FileText className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0 group-hover:text-indigo-500 transition-colors" />
+                          <p className="text-sm font-medium text-slate-600 group-hover:text-slate-800 transition-colors">{prompt}</p>
                         </div>
                       </button>
                     ))}
@@ -243,8 +249,8 @@ export function AIChat() {
             </div>
           </ScrollArea>
 
-          {/* Input */}
-          <div className="p-4 border-t border-border">
+          {/* Input Chát */}
+          <div className="p-4 border-t border-slate-100 bg-white">
             <div className="max-w-3xl mx-auto">
               <div className="flex gap-2">
                 <div className="flex-1 relative">
@@ -253,12 +259,12 @@ export function AIChat() {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    className="pr-12 bg-input-background"
+                    className="pr-16 h-11 bg-slate-50 border-slate-200 focus:bg-white rounded-xl text-sm transition-all"
                     disabled={isTyping}
                   />
                   <Badge
                     variant="secondary"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-xs"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] px-1.5 py-0.5 bg-slate-200/70 text-slate-500 rounded-md font-mono select-none"
                   >
                     Enter ↵
                   </Badge>
@@ -266,14 +272,14 @@ export function AIChat() {
                 <Button
                   onClick={() => handleSend()}
                   disabled={!input.trim() || isTyping}
-                  className="bg-gradient-to-r from-primary to-secondary"
-                  size="icon"
+                  className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 h-11 w-11 rounded-xl text-white shadow-sm flex items-center justify-center shrink-0"
+                  aria-label="Gửi tin nhắn"
                 >
                   <Send className="w-4 h-4" />
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground text-center mt-2">
-                AI có thể mắc lỗi. Hãy kiểm tra thông tin quan trọng.
+              <p className="text-[11px] text-slate-400 text-center mt-2 font-medium">
+                AI có thể mắc lỗi. Hãy kiểm tra thông tin quan trọng trước khi học tập.
               </p>
             </div>
           </div>
