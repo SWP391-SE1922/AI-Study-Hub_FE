@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { ThemeProvider } from 'next-themes';
 import { Toaster } from './components/ui/sonner';
 
@@ -8,39 +8,44 @@ import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
-import { DashboardPage } from './pages/DashboardPage';
+import { DashboardPage }  from './pages/DashboardPage';
 import { DocumentsPage } from './pages/documents/DocumentsPage';
 import { DocumentDetailPage } from './pages/documents/DocumentDetailPage';
 import { AIChat } from './pages/AIChat';
-import { AdminPage } from './pages/admin/AdminPage';
 import { ProfilePage } from './pages/ProfilePage';
 
 // Layout
 import { MainLayout } from './components/layout/MainLayout';
 import { AuthLayout } from './components/layout/AuthLayout';
 
+function ProtectedWrapper({
+  isAuthenticated,
+}: {
+  isAuthenticated: boolean;
+}) {
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Outlet />;
+}
+
 export default function App() {
-  // Mock authentication state - in production use real auth
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return localStorage.getItem('isAuthenticated') === 'true';
+  });
 
-  // Listen for authentication changes
   useEffect(() => {
-    const handleStorageChange = () => {
+    const updateAuth = () => {
       setIsAuthenticated(localStorage.getItem('isAuthenticated') === 'true');
     };
 
-    window.addEventListener('storage', handleStorageChange);
-
-    // Also check on mount and set up a custom event for same-window updates
-    const handleAuthChange = () => {
-      setIsAuthenticated(localStorage.getItem('isAuthenticated') === 'true');
-    };
-
-    window.addEventListener('authChange', handleAuthChange);
+    window.addEventListener('storage', updateAuth);
+    window.addEventListener('authChange', updateAuth);
 
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('authChange', handleAuthChange);
+      window.removeEventListener('storage', updateAuth);
+      window.removeEventListener('authChange', updateAuth);
     };
   }, []);
 
@@ -48,26 +53,62 @@ export default function App() {
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
       <BrowserRouter>
         <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" /> : <LandingPage />} />
+          {/* Public */}
+          <Route
+            path="/"
+            element={
+              isAuthenticated ? (
+                <Navigate to="/dashboard" replace />
+              ) : (
+                <LandingPage />
+              )
+            }
+          />
 
-          {/* Auth Routes */}
+          {/* Auth */}
           <Route element={<AuthLayout />}>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route
+              path="/login"
+              element={
+                isAuthenticated ? (
+                  <Navigate to="/dashboard" replace />
+                ) : (
+                  <LoginPage />
+                )
+              }
+            />
+
+            <Route
+              path="/register"
+              element={
+                isAuthenticated ? (
+                  <Navigate to="/dashboard" replace />
+                ) : (
+                  <RegisterPage />
+                )
+              }
+            />
+
+            <Route
+              path="/forgot-password"
+              element={<ForgotPasswordPage />}
+            />
           </Route>
 
-          {/* Protected Routes */}
-          <Route element={<MainLayout />}>
-            <Route path="/dashboard" element={isAuthenticated ? <DashboardPage /> : <Navigate to="/login" />} />
-            <Route path="/documents" element={isAuthenticated ? <DocumentsPage /> : <Navigate to="/login" />} />
-            <Route path="/documents/:id" element={isAuthenticated ? <DocumentDetailPage /> : <Navigate to="/login" />} />
-            <Route path="/ai-chat" element={isAuthenticated ? <AIChat /> : <Navigate to="/login" />} />
-            <Route path="/admin" element={isAuthenticated ? <AdminPage /> : <Navigate to="/login" />} />
-            <Route path="/profile" element={<ProfilePage />} />
+          {/* Protected */}
+          <Route element={<ProtectedWrapper isAuthenticated={isAuthenticated} />}>
+            <Route element={<MainLayout />}>
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/documents" element={<DocumentsPage />} />
+              <Route path="/documents/:id" element={<DocumentDetailPage />} />
+              <Route path="/ai-chat" element={<AIChat />} />
+              <Route path="/profile" element={<ProfilePage />} />
+            </Route>
           </Route>
+
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+
         <Toaster />
       </BrowserRouter>
     </ThemeProvider>
