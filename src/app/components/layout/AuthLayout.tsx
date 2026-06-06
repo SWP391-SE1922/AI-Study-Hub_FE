@@ -1,4 +1,4 @@
-import { Outlet } from 'react-router';
+import { Outlet } from 'react-router-dom';
 import { BookOpen, Sparkles } from 'lucide-react';
 
 export function AuthLayout() {
