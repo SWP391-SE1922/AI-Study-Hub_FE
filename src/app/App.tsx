@@ -13,11 +13,15 @@ import { DocumentsPage } from './pages/documents/DocumentsPage';
 import { DocumentDetailPage } from './pages/documents/DocumentDetailPage';
 import { AIChat } from './pages/AIChat';
 import { ProfilePage } from './pages/ProfilePage';
+import { AdminDashboardPage } from './pages/admin/adminDashboardPage';
+import { UserPage } from './pages/admin/adminUser';
+import { DocumentPage } from './pages/admin/adminDocument';
+import { AIChatPage } from './pages/admin/adminAIChat';
 
 // Layout
 import { MainLayout } from './components/layout/MainLayout';
 import { AuthLayout } from './components/layout/AuthLayout';
-
+import { AdminLayout } from './components/layout/AdminLayout';
 function ProtectedWrapper({
   isAuthenticated,
 }: {
@@ -93,6 +97,13 @@ export default function App() {
               path="/forgot-password"
               element={<ForgotPasswordPage />}
             />
+          </Route>
+
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route path="dashboard" element={<AdminDashboardPage />} />
+            <Route path="user" element={<UserPage />} />
+            <Route path="document" element={<DocumentPage />} />
+            <Route path="aichat" element={<AIChatPage />} />
           </Route>
 
           {/* Protected */}
