@@ -1,14 +1,13 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
-import { Sparkles } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Eye, EyeOff, User, Mail, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function RegisterPage() {
   const navigate = useNavigate();
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -27,7 +26,7 @@ export function RegisterPage() {
 
     setLoading(true);
 
-    // Mock registration
+    // Giả lập đăng ký thành công
     setTimeout(() => {
       toast.success('Đăng ký thành công!');
       navigate('/login');
@@ -36,92 +35,133 @@ export function RegisterPage() {
   };
 
   return (
-    <div className="w-full max-w-md">
-      <Card className="border-border/50 shadow-xl">
-        <CardHeader className="space-y-4">
-          <div className="flex justify-center">
-            <div className="w-12 h-12 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center">
-              <Sparkles className="w-6 h-6 text-white" />
+    <div className="w-full max-w-md mx-auto space-y-6 p-6">
+
+      {/* Tiêu đề chào mừng - Đồng bộ cấu trúc Login */}
+      <div className="space-y-2 text-center">
+        <h2 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+          Create Account
+        </h2>
+        <p className="text-slate-500 dark:text-slate-400 text-sm">
+          Tạo tài khoản mới để bắt đầu sử dụng AI Study Hub
+        </p>
+      </div>
+
+      {/* Biểu mẫu đăng ký */}
+      <form onSubmit={handleSubmit} className="space-y-4">
+
+        {/* Input Họ và tên */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+            Họ và tên
+          </label>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+              <User className="w-4 h-4" />
             </div>
+            <input
+              type="text"
+              required
+              placeholder="Nguyễn Văn A"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full pl-10 pr-4 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-600 focus:border-transparent transition-all text-sm placeholder:text-slate-400 font-medium shadow-sm"
+            />
           </div>
-          <div className="space-y-2 text-center">
-            <CardTitle className="text-2xl">Đăng ký tài khoản</CardTitle>
-            <CardDescription>
-              Tạo tài khoản mới để bắt đầu sử dụng AI Study Hub
-            </CardDescription>
+        </div>
+
+        {/* Input Email */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+            Email
+          </label>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+              <Mail className="w-4 h-4" />
+            </div>
+            <input
+              type="email"
+              required
+              placeholder="sellostore@company.com"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              className="w-full pl-10 pr-4 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-600 focus:border-transparent transition-all text-sm placeholder:text-slate-400 font-medium shadow-sm"
+            />
           </div>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Họ và tên</Label>
-              <Input
-                id="name"
-                type="text"
-                placeholder="Nguyễn Văn A"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
-                className="bg-input-background"
-              />
-            </div>
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="student@example.com"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                required
-                className="bg-input-background"
-              />
+        {/* Input Mật khẩu */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+            Mật khẩu
+          </label>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+              <Lock className="w-4 h-4" />
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">Mật khẩu</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                required
-                className="bg-input-background"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Xác nhận mật khẩu</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                placeholder="••••••••"
-                value={formData.confirmPassword}
-                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                required
-                className="bg-input-background"
-              />
-            </div>
-
-            <Button
-              type="submit"
-              className="w-full bg-gradient-to-r from-primary to-secondary hover:opacity-90"
-              disabled={loading}
+            <input
+              type={showPassword ? 'text' : 'password'}
+              required
+              placeholder="••••••••"
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              className="w-full pl-10 pr-10 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-600 focus:border-transparent transition-all text-sm placeholder:text-slate-400 font-medium shadow-sm"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
             >
-              {loading ? 'Đang đăng ký...' : 'Đăng ký'}
-            </Button>
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
 
-            <div className="text-center text-sm">
-              <span className="text-muted-foreground">Đã có tài khoản? </span>
-              <Link to="/login" className="text-primary hover:underline font-medium">
-                Đăng nhập ngay
-              </Link>
+        {/* Input Xác nhận mật khẩu */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+            Xác nhận mật khẩu
+          </label>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+              <Lock className="w-4 h-4" />
             </div>
-          </form>
-        </CardContent>
-      </Card>
+            <input
+              type={showConfirmPassword ? 'text' : 'password'}
+              required
+              placeholder="••••••••"
+              value={formData.confirmPassword}
+              onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+              className="w-full pl-10 pr-10 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-600 focus:border-transparent transition-all text-sm placeholder:text-slate-400 font-medium shadow-sm"
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Nút Đăng ký chính dạng Gradient từ Violet sang Indigo */}
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full mt-4 py-2.5 px-4 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-bold rounded-lg shadow-md hover:shadow-lg transition-all text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 disabled:opacity-70"
+        >
+          {loading ? 'Registering...' : 'Register Now'}
+        </button>
+      </form>
+
+      {/* Dòng chuyển hướng quay lại Đăng nhập */}
+      <p className="text-center text-sm text-slate-500">
+        Already Have An Account?{' '}
+        <Link to="/login" className="font-extrabold text-violet-600 hover:text-violet-500 underline-offset-2 hover:underline transition-all">
+          Log In Now.
+        </Link>
+      </p>
+
     </div>
   );
 }
