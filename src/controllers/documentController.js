@@ -35,14 +35,17 @@ const getDocumentById = asyncHandler(async (req, res) => {
 
 /**
  * Cập nhật tài liệu (Chỉ owner hoặc Admin)
+ * Nếu có upload file mới thì tạo thêm version mới
  */
 const updateDocument = asyncHandler(async (req, res) => {
   const updatedDocument = await documentService.updateDocument(
     req.user.id,
     req.user.role,
     req.params.id,
-    req.body
+    req.body,
+    req.file || null
   );
+
   return sendSuccess(res, 'Cập nhật tài liệu thành công', { document: updatedDocument }, null, 200);
 });
 
@@ -55,13 +58,28 @@ const deleteDocument = asyncHandler(async (req, res) => {
 });
 
 /**
- * Tải file tài liệu về (Stream file về client)
+ * Tải file tài liệu về
  */
 const downloadDocument = asyncHandler(async (req, res) => {
   const currentUser = req.user || null;
   const result = await documentService.downloadDocument(currentUser, req.params.id);
 
-  // Tiến hành gửi file stream cho client tải về
+  // Nếu là Cloudinary URL thì trả link cho frontend/Swagger
+  if (result.downloadUrl.startsWith('http')) {
+    return sendSuccess(
+      res,
+      'Lấy link tải tài liệu thành công',
+      {
+        downloadUrl: result.downloadUrl,
+        fileName: result.fileName,
+        mimeType: result.mimeType,
+      },
+      null,
+      200
+    );
+  }
+
+  // Nếu là file local thì tải trực tiếp
   return res.download(result.downloadUrl, result.fileName, (err) => {
     if (err) {
       console.error('Lỗi khi stream download file:', err);
@@ -80,6 +98,19 @@ const getMyDocuments = asyncHandler(async (req, res) => {
   return sendSuccess(res, 'Lấy danh sách tài liệu cá nhân thành công', result.documents, result.pagination, 200);
 });
 
+/**
+ * Lấy lịch sử phiên bản của tài liệu
+ */
+const getDocumentVersions = asyncHandler(async (req, res) => {
+  const versions = await documentService.getDocumentVersions(
+    req.user.id,
+    req.user.role,
+    req.params.id
+  );
+
+  return sendSuccess(res, 'Lấy danh sách phiên bản thành công', { versions }, null, 200);
+});
+
 module.exports = {
   createDocument,
   getAllDocuments,
@@ -88,4 +119,5 @@ module.exports = {
   deleteDocument,
   downloadDocument,
   getMyDocuments,
+  getDocumentVersions,
 };
