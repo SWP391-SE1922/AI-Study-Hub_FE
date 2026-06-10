@@ -163,6 +163,53 @@ router.get('/my-documents', authMiddleware, validate(queryDocumentSchema, 'query
 
 /**
  * @swagger
+ * /api/documents/{id}/versions:
+ *   get:
+ *     summary: Lấy lịch sử phiên bản của tài liệu
+ *     tags: [Documents]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Mã UUID tài liệu
+ *     responses:
+ *       200:
+ *         description: Lấy danh sách phiên bản thành công
+ *       403:
+ *         description: Không có quyền xem lịch sử phiên bản
+ *       404:
+ *         description: Không tìm thấy tài liệu
+ */
+router.get('/:id/versions', authMiddleware, documentController.getDocumentVersions);
+
+/**
+ * @swagger
+ * /api/documents/{id}/download:
+ *   get:
+ *     summary: Tải tệp tin tài liệu xuống máy (Tự động tăng số lượt tải)
+ *     tags: [Documents]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Trả về link tải hoặc tệp tin tài liệu
+ *       403:
+ *         description: Không có quyền tải tài liệu riêng tư
+ */
+router.get('/:id/download', authMiddlewareOptional, documentController.downloadDocument);
+
+/**
+ * @swagger
  * /api/documents/{id}:
  *   get:
  *     summary: Lấy chi tiết thông tin tài liệu
@@ -189,7 +236,7 @@ router.get('/:id', authMiddlewareOptional, documentController.getDocumentById);
  * @swagger
  * /api/documents/{id}:
  *   put:
- *     summary: Cập nhật thông tin chi tiết tài liệu (Chỉ owner hoặc Admin)
+ *     summary: Cập nhật thông tin chi tiết tài liệu, nếu upload file mới thì tạo version mới
  *     tags: [Documents]
  *     security:
  *       - bearerAuth: []
@@ -200,12 +247,16 @@ router.get('/:id', authMiddlewareOptional, documentController.getDocumentById);
  *         schema:
  *           type: string
  *     requestBody:
- *       required: true
+ *       required: false
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: File mới nếu muốn tạo phiên bản mới
  *               title:
  *                 type: string
  *               description:
@@ -224,7 +275,7 @@ router.get('/:id', authMiddlewareOptional, documentController.getDocumentById);
  *       403:
  *         description: Không có quyền chỉnh sửa
  */
-router.put('/:id', authMiddleware, validate(updateDocumentSchema), documentController.updateDocument);
+router.put('/:id', authMiddleware, upload.single('file'), validate(updateDocumentSchema), documentController.updateDocument);
 
 /**
  * @swagger
@@ -247,27 +298,5 @@ router.put('/:id', authMiddleware, validate(updateDocumentSchema), documentContr
  *         description: Không có quyền xóa
  */
 router.delete('/:id', authMiddleware, documentController.deleteDocument);
-
-/**
- * @swagger
- * /api/documents/{id}/download:
- *   get:
- *     summary: Tải tệp tin tài liệu xuống máy (Tự động tăng số lượt tải)
- *     tags: [Documents]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Trả về tệp tin tài liệu tải xuống (File Stream)
- *       403:
- *         description: Không có quyền tải tài liệu riêng tư
- */
-router.get('/:id/download', authMiddlewareOptional, documentController.downloadDocument);
 
 module.exports = router;
