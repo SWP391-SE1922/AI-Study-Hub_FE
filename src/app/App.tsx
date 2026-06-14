@@ -13,10 +13,12 @@ import { DocumentsPage } from './pages/documents/DocumentsPage';
 import { DocumentDetailPage } from './pages/documents/DocumentDetailPage';
 import { AIChat } from './pages/AIChat';
 import { ProfilePage } from './pages/ProfilePage';
+import { AdminPage } from './pages/admin/AdminPage';
 
 // Layout
 import { MainLayout } from './components/layout/MainLayout';
 import { AuthLayout } from './components/layout/AuthLayout';
+import { AdminLayout } from './components/layout/adminLayout';
 
 function ProtectedWrapper({
   isAuthenticated,
@@ -30,14 +32,35 @@ function ProtectedWrapper({
   return <Outlet />;
 }
 
+function AdminProtectedWrapper({
+  isAuthenticated,
+  userRole,
+}: {
+  isAuthenticated: boolean;
+  userRole: string;
+}) {
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  if (userRole !== 'admin') {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <Outlet />;
+}
+
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return localStorage.getItem('isAuthenticated') === 'true';
+  });
+  const [userRole, setUserRole] = useState<string>(() => {
+    return localStorage.getItem('userRole') || 'student';
   });
 
   useEffect(() => {
     const updateAuth = () => {
       setIsAuthenticated(localStorage.getItem('isAuthenticated') === 'true');
+      setUserRole(localStorage.getItem('userRole') || 'student');
     };
 
     window.addEventListener('storage', updateAuth);
@@ -58,7 +81,11 @@ export default function App() {
             path="/"
             element={
               isAuthenticated ? (
-                <Navigate to="/dashboard" replace />
+                userRole === 'admin' ? (
+                  <Navigate to="/admin" replace />
+                ) : (
+                  <Navigate to="/dashboard" replace />
+                )
               ) : (
                 <LandingPage />
               )
@@ -71,7 +98,11 @@ export default function App() {
               path="/login"
               element={
                 isAuthenticated ? (
-                  <Navigate to="/dashboard" replace />
+                  userRole === 'admin' ? (
+                    <Navigate to="/admin" replace />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
                 ) : (
                   <LoginPage />
                 )
@@ -82,7 +113,11 @@ export default function App() {
               path="/register"
               element={
                 isAuthenticated ? (
-                  <Navigate to="/dashboard" replace />
+                  userRole === 'admin' ? (
+                    <Navigate to="/admin" replace />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
                 ) : (
                   <RegisterPage />
                 )
@@ -95,7 +130,7 @@ export default function App() {
             />
           </Route>
 
-          {/* Protected */}
+          {/* Student Protected */}
           <Route element={<ProtectedWrapper isAuthenticated={isAuthenticated} />}>
             <Route element={<MainLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
@@ -103,6 +138,13 @@ export default function App() {
               <Route path="/documents/:id" element={<DocumentDetailPage />} />
               <Route path="/ai-chat" element={<AIChat />} />
               <Route path="/profile" element={<ProfilePage />} />
+            </Route>
+          </Route>
+
+          {/* Admin Protected */}
+          <Route element={<AdminProtectedWrapper isAuthenticated={isAuthenticated} userRole={userRole} />}>
+            <Route element={<AdminLayout />}>
+              <Route path="/admin" element={<AdminPage />} />
             </Route>
           </Route>
 

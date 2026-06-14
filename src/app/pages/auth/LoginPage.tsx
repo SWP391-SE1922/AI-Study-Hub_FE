@@ -12,14 +12,26 @@ export function LoginPage() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     localStorage.setItem('isAuthenticated', 'true');
+    const role = email.toLowerCase().includes('admin') ? 'admin' : 'student';
+    localStorage.setItem('userRole', role);
     window.dispatchEvent(new Event('authChange'));
-    navigate('/dashboard');
+    if (role === 'admin') {
+      navigate('/admin');
+    } else {
+      navigate('/dashboard');
+    }
   };
 
   const handleGoogleLogin = () => {
     localStorage.setItem('isAuthenticated', 'true');
+    const role = email.toLowerCase().includes('admin') ? 'admin' : 'student';
+    localStorage.setItem('userRole', role);
     window.dispatchEvent(new Event('authChange'));
-    navigate('/dashboard');
+    if (role === 'admin') {
+      navigate('/admin');
+    } else {
+      navigate('/dashboard');
+    }
   };
 
   return (
