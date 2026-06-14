@@ -1,83 +1,78 @@
-<<<<<<< HEAD
-# AI Management System - Backend
+# AI Study Hub - Integrated Platform
 
-Dự án này là hệ thống Backend được xây dựng bằng **Node.js**, **ExpressJS**, **Prisma ORM** và sử dụng cơ sở dữ liệu **SQL Server**. Dự án đã được cấu hình tự động hóa toàn bộ quá trình khởi tạo cơ sở dữ liệu, chạy migration và tạo dữ liệu mẫu (seed data).
-
-## 🚀 Quy trình Thiết lập & Khởi chạy dự án
-
-Khi clone dự án này về máy lần đầu, bạn chỉ cần thực hiện theo các bước sau:
-
-### Bước 1: Clone dự án và truy cập thư mục backend
-```bash
-git clone <URL_REPOS_GIT>
-cd backend
-```
-
-### Bước 2: Cài đặt các thư viện phụ thuộc (Dependencies)
-```bash
-npm install
-```
-
-### Bước 3: Tạo và cấu hình file môi trường `.env`
-Sao chép cấu hình từ file mẫu `.env.example` thành file `.env`:
-* **Windows (Command Prompt):**
-  ```cmd
-  copy .env.example .env
-  ```
-* **PowerShell hoặc Git Bash / macOS / Linux:**
-  ```bash
-  cp .env.example .env
-  ```
-Sau đó, hãy mở file `.env` vừa tạo và chỉnh sửa lại phần thông tin đăng nhập SQL Server (password và port) của bạn:
-```env
-DATABASE_URL="sqlserver://localhost:<CỔNG_SQL_SERVER>;database=ai_management_system;user=sa;password=<MẬT_KHẨU_SA>;encrypt=true;trustServerCertificate=true"
-```
-
-### Bước 4: Chạy lệnh thiết lập tự động (Setup)
-Chạy lệnh duy nhất sau để tự động thiết lập toàn bộ database:
-```bash
-npm run setup
-```
-Lệnh này sẽ tự động:
-1. Tạo database `ai_management_system` trên SQL Server của bạn.
-2. Tạo Client thư viện Prisma (`prisma generate`).
-3. Chạy các migrations để tạo bảng dữ liệu (`prisma migrate dev`).
-4. Chèn dữ liệu mẫu vào cơ sở dữ liệu (`prisma db seed`).
-
-### Bước 5: Khởi chạy dự án ở chế độ Development
-```bash
-npm run dev
-```
-Dự án sẽ khởi động ở địa chỉ `http://localhost:5000` (hoặc cổng cấu hình trong file `.env`).
+Dự án này là hệ thống **AI Study Hub**, bao gồm cả hai thành phần **Frontend (React/Vite)** và **Backend (Node.js/Express/Prisma)** tích hợp trong cùng một thư mục làm việc.
 
 ---
 
 ## 📁 Cấu trúc thư mục dự án
+
 ```text
-backend/
 ├── prisma/
-│   ├── migrations/      # Chứa các file lịch sử migration cơ sở dữ liệu (phải commit lên git)
-│   ├── schema.prisma    # File cấu hình database engine và định nghĩa model (User)
-│   └── seed.js          # File chèn dữ liệu mẫu ban đầu (Admin và Student)
+│   ├── migrations/      # Lịch sử migration cơ sở dữ liệu
+│   ├── schema.prisma    # Định nghĩa mô hình dữ liệu (Prisma Schema)
+│   └── seed.js          # Chèn dữ liệu mẫu ban đầu (Seed data)
 ├── src/
-│   ├── config/
-│   │   └── db.js        # Khởi tạo và export Prisma Client
-│   ├── controller/      # Nơi xử lý logic nghiệp vụ các request (như login, profile...)
-│   ├── middleware/      # Nơi kiểm tra xác thực JWT và phân quyền Admin
-│   ├── routes/          # Định nghĩa các endpoint API (ví dụ: /api/auth)
-│   ├── services/        # Các dịch vụ xử lý logic độc lập (nếu có)
-│   ├── app.js           # Cấu hình Express và Middleware toàn cục
-│   └── server.js        # Entrypoint khởi chạy server lắng nghe kết nối
-├── .env                 # File cấu hình môi trường chứa thông tin kết nối nhạy cảm (không commit lên git)
-├── .env.example         # File mẫu cấu hình môi trường (cần commit lên git)
+│   ├── app/             # [Frontend] Mã nguồn React, Components, Pages, State
+│   ├── controllers/     # [Backend] Xử lý logic nghiệp vụ các request
+│   ├── middlewares/     # [Backend] Xác thực JWT, phân quyền, xử lý lỗi
+│   ├── routes/          # [Backend] Định nghĩa các endpoint API (ví dụ: /api/auth)
+│   ├── services/        # [Backend] Các dịch vụ xử lý logic nghiệp vụ độc lập
+│   ├── app.js           # [Backend] Cấu hình Express và Middleware
+│   ├── main.tsx         # [Frontend] Entrypoint của React App
+│   └── server.js        # [Backend] Entrypoint chạy Express server
 ├── package.json         # Khai báo các lệnh script và thư viện phụ thuộc
-└── test-db.js           # Script kiểm tra kết nối nhanh tới DB
+└── vite.config.mts      # Cấu hình build và chạy Frontend Vite
+```
+
+---
+
+## 🚀 Quy trình Thiết lập & Khởi chạy dự án
+
+### Bước 1: Cài đặt thư viện phụ thuộc (Dependencies)
+Chạy lệnh sau tại thư mục gốc để cài đặt tất cả thư viện cho cả FE và BE:
+```bash
+npm install
+```
+
+### Bước 2: Tạo và cấu hình file môi trường `.env`
+Sao chép cấu hình từ file mẫu `.env.example` thành file `.env` ở thư mục gốc và cấu hình kết nối database SQL Server cùng SMTP Email:
+```env
+PORT=3636
+DATABASE_URL="sqlserver://localhost:1433;database=ai_management_system;user=sa;password=<MAT_KHAU_CUA_BAN>;encrypt=true;trustServerCertificate=true"
+JWT_SECRET="uAiVBkJekQZ0eFI0MmPJXQLYSF6WVHCNV21BG24RAl0"
+BCRYPT_SALT_ROUNDS=10
+
+# Cấu hình Email gửi đi (SMTP)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=ntan0409@gmail.com
+SMTP_PASS=geokvydsihqresri
+```
+
+### Bước 3: Thiết lập Cơ sở dữ liệu tự động
+Chạy lệnh duy nhất sau để tự động khởi tạo database, chạy migrations và thêm tài liệu/tài khoản mẫu:
+```bash
+npm run setup
+```
+
+### Bước 4: Khởi chạy dự án
+
+#### Chạy Frontend (Vite)
+Mặc định chạy ở `http://localhost:5173`:
+```bash
+npm run dev
+```
+
+#### Chạy Backend (Nodemon)
+Mặc định chạy ở `http://localhost:3636`:
+```bash
+npm run dev:be
 ```
 
 ---
 
 ## 👥 Tài khoản Dữ liệu Mẫu (Seed Data)
-Sau khi chạy lệnh `npm run setup`, các tài khoản mẫu sau sẽ được tự động mã hóa mật khẩu bằng `bcrypt` và thêm vào cơ sở dữ liệu:
+Sau khi chạy lệnh `npm run setup`, các tài khoản sau sẽ được tạo tự động:
 
 1. **Tài khoản Admin:**
    * **Email:** `admin@gmail.com`
@@ -88,16 +83,3 @@ Sau khi chạy lệnh `npm run setup`, các tài khoản mẫu sau sẽ được
    * **Email:** `student@gmail.com`
    * **Mật khẩu:** `123456`
    * **Role:** `student`
-=======
-
-  # AI Study Hub Design
-
-  This is a code bundle for AI Study Hub Design. The original project is available at https://www.figma.com/design/OBUigda5Bb8u2riqV0XyvA/AI-Study-Hub-Design.
-
-  ## Running the code
-
-  Run `npm i` to install the dependencies.
-
-  Run `npm run dev` to start the development server.
-  
->>>>>>> origin/main
