@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, FileText, MessageSquare, LogOut, Menu, X, Sun, Moon } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, MessageSquare, LogOut, Menu, X, Sun, Moon, ShoppingBag, Tag, BookOpen } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Button } from '../ui/button';
 import { Avatar, AvatarFallback } from '../ui/avatar';
@@ -21,7 +21,11 @@ export function AdminLayout() {
     { path: '/admin/dashboard', label: 'Dashboard Admin', icon: LayoutDashboard },
     { path: '/admin/user', label: 'Quản lý User', icon: Users },
     { path: '/admin/document', label: 'Quản lý Tài liệu', icon: FileText },
+    { path: '/admin/category', label: 'Quản lý Danh mục', icon: Tag },
+    { path: '/admin/subject', label: 'Quản lý Môn học', icon: BookOpen },
+    { path: '/admin/product', label: 'Quản lý Sản phẩm', icon: ShoppingBag },
     { path: '/admin/aichat', label: 'AI Chat Admin', icon: MessageSquare },
+    { path: '/documents', label: 'Trang Học sinh', icon: LayoutDashboard },
   ];
 
   return (

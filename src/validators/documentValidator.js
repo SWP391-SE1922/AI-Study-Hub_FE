@@ -13,7 +13,11 @@ const createDocumentSchema = Joi.object({
   categoryId: Joi.string().uuid().allow('', null).optional().messages({
     'string.uuid': 'Mã danh mục không đúng định dạng UUID',
   }),
+  folderId: Joi.string().uuid().allow('root', '', null).optional().messages({
+    'string.uuid': 'Mã thư mục không đúng định dạng UUID',
+  }),
   isPublic: Joi.boolean().default(true).optional(),
+  imgUrl: Joi.string().allow('', null).optional(),
 });
 
 const updateDocumentSchema = Joi.object({
@@ -26,7 +30,11 @@ const updateDocumentSchema = Joi.object({
   categoryId: Joi.string().uuid().allow('', null).optional().messages({
     'string.uuid': 'Mã danh mục không đúng định dạng UUID',
   }),
+  folderId: Joi.string().uuid().allow('root', '', null).optional().messages({
+    'string.uuid': 'Mã thư mục không đúng định dạng UUID',
+  }),
   isPublic: Joi.boolean().optional(),
+  imgUrl: Joi.string().allow('', null).optional(),
 });
 
 const queryDocumentSchema = Joi.object({

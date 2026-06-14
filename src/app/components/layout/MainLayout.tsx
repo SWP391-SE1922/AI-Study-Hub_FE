@@ -1,14 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, FileText, MessageSquare, Settings, LogOut, Menu, X, Sun, Moon } from 'lucide-react';
+import { LayoutDashboard, FileText, FolderClosed, MessageSquare, Settings, LogOut, Menu, X, Sun, Moon } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Button } from '../ui/button';
-import { Avatar, AvatarFallback } from '../ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 
 export function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const { theme, setTheme } = useTheme();
+
+  const [user, setUser] = useState(() => {
+    const localUser = localStorage.getItem('user');
+    return localUser ? JSON.parse(localUser) : null;
+  });
+
+  useEffect(() => {
+    const handleAuthChange = () => {
+      const localUser = localStorage.getItem('user');
+      setUser(localUser ? JSON.parse(localUser) : null);
+    };
+    window.addEventListener('storage', handleAuthChange);
+    window.addEventListener('authChange', handleAuthChange);
+    return () => {
+      window.removeEventListener('storage', handleAuthChange);
+      window.removeEventListener('authChange', handleAuthChange);
+    };
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('isAuthenticated');
@@ -19,9 +37,14 @@ export function MainLayout() {
   const menuItems = [
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/documents', label: 'Tài liệu', icon: FileText },
+    { path: '/my-documents', label: 'Tài liệu của tôi', icon: FolderClosed },
     { path: '/ai-chat', label: 'AI Chat', icon: MessageSquare },
     { path: '/profile', label: 'Settings', icon: Settings },
   ];
+
+  if (user?.role === 'ADMIN') {
+    menuItems.push({ path: '/admin/dashboard', label: 'Trang Admin', icon: LayoutDashboard });
+  }
 
   return (
     // Sử dụng bg-background để tự động chuyển từ Trắng sang Đen theo hệ thống
@@ -72,11 +95,14 @@ export function MainLayout() {
 
           <div className="flex items-center gap-3 border-l border-border pl-4">
             <Avatar className="w-8 h-8 border border-border">
-              <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">SV</AvatarFallback>
+              <AvatarImage src={user?.avatarUrl || undefined} alt={user?.fullName || 'Sinh viên'} />
+              <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
+                {user?.fullName ? user.fullName.substring(0, 2).toUpperCase() : 'SV'}
+              </AvatarFallback>
             </Avatar>
             <div className="hidden sm:block text-left">
-              <p className="text-xs font-bold text-foreground">Sinh viên</p>
-              <p className="text-[10px] text-muted-foreground font-medium">student@example.com</p>
+              <p className="text-xs font-bold text-foreground">{user?.fullName || 'Sinh viên'}</p>
+              <p className="text-[10px] text-muted-foreground font-medium">{user?.email || 'student@example.com'}</p>
             </div>
           </div>
         </div>

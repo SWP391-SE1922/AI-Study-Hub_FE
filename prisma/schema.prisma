@@ -17,11 +17,14 @@ model User {
   isVerified          Boolean   @default(false)
   resetPasswordToken  String?
   resetPasswordExpire DateTime?
+  usedStorage         Float     @default(0)
+  storageLimit        Float     @default(104857600)
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
   documents Document[]
   subjects  Subject[]
+  folders   Folder[]
 
   @@map("users")
 }
@@ -53,6 +56,22 @@ model Subject {
   @@map("subjects")
 }
 
+model Folder {
+  id        String     @id @default(uuid())
+  name      String
+  userId    String
+  parentId  String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent    Folder?    @relation("FolderToFolder", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children  Folder[]   @relation("FolderToFolder")
+  documents Document[]
+
+  @@unique([name, parentId, userId])
+  @@map("folders")
+}
+
 model Document {
   id          String  @id @default(uuid())
   title       String
@@ -60,6 +79,7 @@ model Document {
 
   subject   String?
   subjectId String?
+  folderId  String?
 
   fileUrl       String
   fileName      String
@@ -69,6 +89,7 @@ model Document {
   categoryId    String?
   isPublic      Boolean  @default(true)
   downloadCount Int      @default(0)
+  imgUrl        String?
 
   currentVersion Int @default(1)
 
@@ -78,6 +99,7 @@ model Document {
   user       User      @relation(fields: [uploadedBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
   category   Category? @relation(fields: [categoryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   subjectRef Subject?  @relation(fields: [subjectId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  folder     Folder?   @relation(fields: [folderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   versions DocumentVersion[]
 

@@ -35,9 +35,27 @@ const deleteUser = asyncHandler(async (req, res) => {
   return res.status(204).end(); // Trả về 204 No Content
 });
 
+/**
+ * Tạo mới người dùng (Admin Only)
+ */
+const createUser = asyncHandler(async (req, res) => {
+  const newUser = await userService.createUser(req.body);
+  return sendSuccess(res, 'Tạo mới người dùng thành công', { user: newUser }, null, 201);
+});
+
+/**
+ * Cập nhật thông tin chi tiết người dùng (Admin Only)
+ */
+const updateUser = asyncHandler(async (req, res) => {
+  const updatedUser = await userService.updateUser(req.params.id, req.body);
+  return sendSuccess(res, 'Cập nhật người dùng thành công', { user: updatedUser }, null, 200);
+});
+
 module.exports = {
   getAllUsers,
   getUserById,
   updateUserRole,
   deleteUser,
+  createUser,
+  updateUser,
 };

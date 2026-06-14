@@ -1,5 +1,6 @@
 const prisma = require('../config/database');
 const { getPaginationParams, getPaginationMetadata } = require('../utils/pagination');
+const bcrypt = require('bcrypt');
 
 /**
  * Lấy danh sách người dùng kèm phân trang & tìm kiếm (Admin Only)
@@ -32,6 +33,8 @@ const getAllUsers = async (queryParams) => {
       avatarUrl: true,
       role: true,
       isVerified: true,
+      usedStorage: true,
+      storageLimit: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -56,6 +59,8 @@ const getUserById = async (id) => {
       avatarUrl: true,
       role: true,
       isVerified: true,
+      usedStorage: true,
+      storageLimit: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -122,6 +127,97 @@ const updateProfile = async (userId, data) => {
       avatarUrl: true,
       role: true,
       isVerified: true,
+      usedStorage: true,
+      storageLimit: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+
+  return updatedUser;
+};
+
+/**
+ * Tạo mới người dùng (Admin Only)
+ */
+const createUser = async (data) => {
+  const { email, fullName, role, password } = data;
+
+  const existingUser = await prisma.user.findUnique({ where: { email } });
+  if (existingUser) {
+    const error = new Error('Email này đã được sử dụng trên hệ thống.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  const newUser = await prisma.user.create({
+    data: {
+      email,
+      fullName,
+      role: role || 'USER',
+      password: hashedPassword,
+      isVerified: true,
+    },
+    select: {
+      id: true,
+      email: true,
+      fullName: true,
+      role: true,
+      isVerified: true,
+      createdAt: true,
+    },
+  });
+
+  return newUser;
+};
+
+/**
+ * Cập nhật thông tin chi tiết người dùng (Admin Only)
+ */
+const updateUser = async (id, data) => {
+  const { email, fullName, role, isVerified, storageLimit, password } = data;
+
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user) {
+    const error = new Error('Không tìm thấy người dùng.');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (email && email !== user.email) {
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      const error = new Error('Email này đã được sử dụng trên hệ thống.');
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+
+  const updateData = {
+    ...(email !== undefined && { email }),
+    ...(fullName !== undefined && { fullName }),
+    ...(role !== undefined && { role }),
+    ...(isVerified !== undefined && { isVerified }),
+    ...(storageLimit !== undefined && { storageLimit }),
+  };
+
+  if (password) {
+    updateData.password = await bcrypt.hash(password, 10);
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { id },
+    data: updateData,
+    select: {
+      id: true,
+      email: true,
+      fullName: true,
+      role: true,
+      isVerified: true,
+      usedStorage: true,
+      storageLimit: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -136,4 +232,6 @@ module.exports = {
   updateUserRole,
   deleteUser,
   updateProfile,
+  createUser,
+  updateUser,
 };

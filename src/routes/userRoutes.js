@@ -15,6 +15,31 @@ const changeRoleSchema = Joi.object({
   }),
 });
 
+const createUserSchema = Joi.object({
+  email: Joi.string().email().required().messages({
+    'string.email': 'Email không hợp lệ',
+    'any.required': 'Email là bắt buộc',
+  }),
+  fullName: Joi.string().trim().required().messages({
+    'string.empty': 'Họ và tên không được để trống',
+    'any.required': 'Họ và tên là bắt buộc',
+  }),
+  role: Joi.string().valid('GUEST', 'USER', 'ADMIN').default('USER'),
+  password: Joi.string().min(6).required().messages({
+    'string.min': 'Mật khẩu phải từ 6 ký tự trở lên',
+    'any.required': 'Mật khẩu là bắt buộc',
+  }),
+});
+
+const updateUserSchema = Joi.object({
+  email: Joi.string().email().optional(),
+  fullName: Joi.string().trim().optional(),
+  role: Joi.string().valid('GUEST', 'USER', 'ADMIN').optional(),
+  isVerified: Joi.boolean().optional(),
+  storageLimit: Joi.number().min(0).optional(),
+  password: Joi.string().min(6).optional().allow('', null),
+});
+
 /**
  * @swagger
  * /api/users:
@@ -97,6 +122,8 @@ router.get('/:id', authMiddleware, requireRole('ADMIN'), userController.getUserB
  *         description: Thay đổi thành công
  */
 router.put('/:id/role', authMiddleware, requireRole('ADMIN'), validate(changeRoleSchema), userController.updateUserRole);
+router.post('/', authMiddleware, requireRole('ADMIN'), validate(createUserSchema), userController.createUser);
+router.put('/:id', authMiddleware, requireRole('ADMIN'), validate(updateUserSchema), userController.updateUser);
 
 /**
  * @swagger

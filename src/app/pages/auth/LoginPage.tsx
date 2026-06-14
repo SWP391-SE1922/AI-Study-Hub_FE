@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
+import { toast } from 'sonner';
+import { apiRequest } from '../../services/api';
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -9,17 +11,47 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem('isAuthenticated', 'true');
-    window.dispatchEvent(new Event('authChange'));
-    navigate('/dashboard');
+    setLoading(true);
+    try {
+      const data = await apiRequest('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      });
+      
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      localStorage.setItem('isAuthenticated', 'true');
+      
+      window.dispatchEvent(new Event('authChange'));
+      toast.success('Đăng nhập thành công!');
+      if (data.user && data.user.role === 'ADMIN') {
+        navigate('/admin/dashboard');
+      } else {
+        navigate('/dashboard');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại!');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGoogleLogin = () => {
     localStorage.setItem('isAuthenticated', 'true');
+    const localUser = localStorage.getItem('user');
+    let isAdminUser = false;
+    if (localUser) {
+      try {
+        const parsed = JSON.parse(localUser);
+        isAdminUser = parsed.role === 'ADMIN';
+      } catch (e) {}
+    }
     window.dispatchEvent(new Event('authChange'));
-    navigate('/dashboard');
+    navigate(isAdminUser ? '/admin/dashboard' : '/dashboard');
   };
 
   return (
@@ -103,9 +135,10 @@ export function LoginPage() {
         {/* Nút Đăng nhập chính */}
         <button
           type="submit"
-          className="w-full mt-2 py-2.5 px-4 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-bold rounded-lg shadow-md hover:shadow-lg transition-all text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2"
+          disabled={loading}
+          className="w-full mt-2 py-2.5 px-4 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-bold rounded-lg shadow-md hover:shadow-lg transition-all text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 disabled:opacity-70 flex items-center justify-center gap-2"
         >
-          Log In
+          {loading ? 'Logging in...' : 'Log In'}
         </button>
       </form>
 

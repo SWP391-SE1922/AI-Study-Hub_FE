@@ -11,12 +11,16 @@ import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
 import { DashboardPage }  from './pages/DashboardPage';
 import { DocumentsPage } from './pages/documents/DocumentsPage';
 import { DocumentDetailPage } from './pages/documents/DocumentDetailPage';
+import { MyDocumentsPage } from './pages/documents/MyDocumentsPage';
 import { AIChat } from './pages/AIChat';
 import { ProfilePage } from './pages/ProfilePage';
 import { AdminDashboardPage } from './pages/admin/adminDashboardPage';
 import { UserPage } from './pages/admin/adminUser';
 import { DocumentPage } from './pages/admin/adminDocument';
 import { AIChatPage } from './pages/admin/adminAIChat';
+import { AdminProductPage } from './pages/admin/adminProduct';
+import { CategoryPage } from './pages/admin/adminCategory';
+import { SubjectPage } from './pages/admin/adminSubject';
 
 // Layout
 import { MainLayout } from './components/layout/MainLayout';
@@ -38,10 +42,29 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return localStorage.getItem('isAuthenticated') === 'true';
   });
+  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        const parsed = JSON.parse(userStr);
+        return parsed.role === 'ADMIN';
+      }
+    } catch (e) {}
+    return false;
+  });
 
   useEffect(() => {
     const updateAuth = () => {
       setIsAuthenticated(localStorage.getItem('isAuthenticated') === 'true');
+      try {
+        const userStr = localStorage.getItem('user');
+        if (userStr) {
+          const parsed = JSON.parse(userStr);
+          setIsAdmin(parsed.role === 'ADMIN');
+          return;
+        }
+      } catch (e) {}
+      setIsAdmin(false);
     };
 
     window.addEventListener('storage', updateAuth);
@@ -62,7 +85,7 @@ export default function App() {
             path="/"
             element={
               isAuthenticated ? (
-                <Navigate to="/dashboard" replace />
+                <Navigate to={isAdmin ? "/admin/dashboard" : "/dashboard"} replace />
               ) : (
                 <LandingPage />
               )
@@ -75,7 +98,7 @@ export default function App() {
               path="/login"
               element={
                 isAuthenticated ? (
-                  <Navigate to="/dashboard" replace />
+                  <Navigate to={isAdmin ? "/admin/dashboard" : "/dashboard"} replace />
                 ) : (
                   <LoginPage />
                 )
@@ -86,7 +109,7 @@ export default function App() {
               path="/register"
               element={
                 isAuthenticated ? (
-                  <Navigate to="/dashboard" replace />
+                  <Navigate to={isAdmin ? "/admin/dashboard" : "/dashboard"} replace />
                 ) : (
                   <RegisterPage />
                 )
@@ -103,15 +126,24 @@ export default function App() {
             <Route path="dashboard" element={<AdminDashboardPage />} />
             <Route path="user" element={<UserPage />} />
             <Route path="document" element={<DocumentPage />} />
+            <Route path="category" element={<CategoryPage />} />
+            <Route path="subject" element={<SubjectPage />} />
+            <Route path="product" element={<AdminProductPage />} />
             <Route path="aichat" element={<AIChatPage />} />
           </Route>
 
           {/* Protected */}
           <Route element={<ProtectedWrapper isAuthenticated={isAuthenticated} />}>
             <Route element={<MainLayout />}>
-              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route 
+                path="/dashboard" 
+                element={
+                  isAdmin ? <Navigate to="/admin/dashboard" replace /> : <DashboardPage />
+                } 
+              />
               <Route path="/documents" element={<DocumentsPage />} />
               <Route path="/documents/:id" element={<DocumentDetailPage />} />
+              <Route path="/my-documents" element={<MyDocumentsPage />} />
               <Route path="/ai-chat" element={<AIChat />} />
               <Route path="/profile" element={<ProfilePage />} />
             </Route>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff, User, Mail, Lock } from 'lucide-react';
 import { toast } from 'sonner';
+import { apiRequest } from '../../services/api';
 
 export function RegisterPage() {
   const navigate = useNavigate();
@@ -26,12 +27,22 @@ export function RegisterPage() {
 
     setLoading(true);
 
-    // Giả lập đăng ký thành công
-    setTimeout(() => {
-      toast.success('Đăng ký thành công!');
+    try {
+      await apiRequest('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+          fullName: formData.name,
+        }),
+      });
+      toast.success('Đăng ký tài khoản thành công!');
       navigate('/login');
+    } catch (err: any) {
+      toast.error(err.message || 'Đăng ký tài khoản thất bại. Vui lòng thử lại!');
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   return (

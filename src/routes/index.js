@@ -7,6 +7,7 @@ const dashboardRoutes = require('./dashboardRoutes');
 const profileRoutes = require('./profileRoutes');
 const aiRoutes = require('./aiRoutes');
 const subjectRoutes = require('./subjectRoutes');
+const folderRoutes = require('./folderRoutes');
 
 const router = express.Router();
 
@@ -19,5 +20,6 @@ router.use('/dashboard', dashboardRoutes);
 router.use('/profile', profileRoutes);
 router.use('/ai', aiRoutes);
 router.use('/subjects', subjectRoutes);
+router.use('/', folderRoutes);
 
 module.exports = router;

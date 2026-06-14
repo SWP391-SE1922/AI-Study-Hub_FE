@@ -1,17 +1,20 @@
 import * as React from 'react';
-import { useState } from 'react';
-import { User, Mail, IdCard, Phone, Camera, Save, GraduationCap, Calendar, Users } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { User, Mail, IdCard, Phone, Camera, Save, GraduationCap, Calendar, Users, Loader2 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
+import { toast } from 'sonner';
+import { apiRequest } from '../services/api';
 
 export function ProfilePage() {
-  // Mock dữ liệu profile sinh viên mở rộng
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
-    fullName: 'Sinh viên',
-    studentId: 'SV001',
-    email: 'student@gmail.com',
+    fullName: '',
+    studentId: '',
+    email: '',
     phone: '0123456789',
     major: 'Công nghệ thông tin',
     batch: 'Khóa 2023 (K19)',
@@ -19,15 +22,99 @@ export function ProfilePage() {
     avatarUrl: ''
   });
 
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const data = await apiRequest('/auth/me');
+        const user = data.user;
+        setFormData({
+          fullName: user.fullName || '',
+          studentId: user.id ? `SV-${user.id.substring(0, 8).toUpperCase()}` : '',
+          email: user.email || '',
+          phone: '0123456789',
+          major: 'Công nghệ thông tin',
+          batch: 'Khóa 2023 (K19)',
+          classGroup: 'SE1922',
+          avatarUrl: user.avatarUrl || ''
+        });
+      } catch (err: any) {
+        toast.error(err.message || 'Không thể lấy thông tin cá nhân!');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProfile();
+  }, []);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    alert('Đã lưu thay đổi thông tin cá nhân thành công!');
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        toast.error('Kích thước ảnh đại diện không được vượt quá 2MB!');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData((prev) => ({ ...prev, avatarUrl: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
   };
+
+  const getInitials = (name: string) => {
+    if (!name) return 'SV';
+    const clean = name.trim();
+    if (!clean) return 'SV';
+    const parts = clean.split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return clean.substring(0, 2).toUpperCase();
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await apiRequest('/auth/update-profile', {
+        method: 'PUT',
+        body: JSON.stringify({
+          fullName: formData.fullName,
+          avatarUrl: formData.avatarUrl,
+        }),
+      });
+
+      // Update local storage user data
+      const localUser = localStorage.getItem('user');
+      if (localUser) {
+        const parsed = JSON.parse(localUser);
+        parsed.fullName = formData.fullName;
+        parsed.avatarUrl = formData.avatarUrl;
+        localStorage.setItem('user', JSON.stringify(parsed));
+        window.dispatchEvent(new Event('authChange'));
+      }
+
+      toast.success('Đã lưu thay đổi thông tin cá nhân thành công!');
+    } catch (err: any) {
+      toast.error(err.message || 'Cập nhật thông tin cá nhân thất bại!');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
+        <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
+        <p className="text-sm text-slate-500 font-medium">Đang tải thông tin cá nhân...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 text-slate-700 dark:text-slate-300 p-2">
@@ -49,9 +136,9 @@ export function ProfilePage() {
           <CardContent className="flex flex-col items-center justify-center p-6 pt-2 space-y-4">
             <div className="relative group">
               <Avatar className="w-28 h-28 border-4 border-slate-100 dark:border-slate-800 shadow-md">
-                <AvatarImage src={formData.avatarUrl} alt={formData.fullName} />
+                <AvatarImage src={formData.avatarUrl || undefined} alt={formData.fullName} />
                 <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-bold text-3xl select-none">
-                  SV
+                  {getInitials(formData.fullName)}
                 </AvatarFallback>
               </Avatar>
               <label
@@ -60,7 +147,7 @@ export function ProfilePage() {
                 title="Thay đổi ảnh"
               >
                 <Camera className="w-4 h-4" />
-                <input type="file" id="avatar-upload" className="hidden" accept="image/*" />
+                <input type="file" id="avatar-upload" className="hidden" accept="image/*" onChange={handleAvatarChange} />
               </label>
             </div>
 
@@ -145,12 +232,12 @@ export function ProfilePage() {
 
             <hr className="border-slate-100 dark:border-slate-800" />
 
-            {/* Nhóm 2: Thông tin tổ chức lớp học bổ sung mới */}
+            {/* Nhóm 2: Thông tin tổ chức lớp học bổ sung mới
             <div className="space-y-4">
               <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Thông tin đào tạo</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {/* Chuyên ngành */}
-                <div className="space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4"> */}
+            {/* Chuyên ngành */}
+            {/* <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                     <GraduationCap className="w-3.5 h-3.5 text-slate-400" /> Ngành học
                   </label>
@@ -161,10 +248,10 @@ export function ProfilePage() {
                     onChange={handleChange}
                     className="h-11 bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 focus:bg-white rounded-xl text-sm transition-all text-slate-900 dark:text-slate-100"
                   />
-                </div>
+                </div> */}
 
-                {/* Niên khóa */}
-                <div className="space-y-2">
+            {/* Niên khóa */}
+            {/* <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                     <Calendar className="w-3.5 h-3.5 text-slate-400" /> Khóa học
                   </label>
@@ -175,10 +262,10 @@ export function ProfilePage() {
                     onChange={handleChange}
                     className="h-11 bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 focus:bg-white rounded-xl text-sm transition-all text-slate-900 dark:text-slate-100"
                   />
-                </div>
+                </div> */}
 
-                {/* Lớp sinh hoạt */}
-                <div className="space-y-2">
+            {/* Lớp sinh hoạt */}
+            {/* <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                     <Users className="w-3.5 h-3.5 text-slate-400" /> Lớp sinh hoạt
                   </label>
@@ -189,9 +276,9 @@ export function ProfilePage() {
                     onChange={handleChange}
                     className="h-11 bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 focus:bg-white rounded-xl text-sm transition-all text-slate-900 dark:text-slate-100"
                   />
-                </div>
-              </div>
-            </div>
+                </div> */}
+            {/* </div>
+            </div> */}
 
             <hr className="border-slate-100 dark:border-slate-800" />
 
@@ -199,10 +286,20 @@ export function ProfilePage() {
             <div className="flex justify-end pt-2">
               <Button
                 type="submit"
-                className="w-full sm:w-auto bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-xl px-6 h-11 font-medium shadow-md shadow-indigo-500/10 flex items-center justify-center gap-2"
+                disabled={submitting}
+                className="w-full sm:w-auto bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-xl px-6 h-11 font-medium shadow-md shadow-indigo-500/10 flex items-center justify-center gap-2 disabled:opacity-75"
               >
-                <Save className="w-4 h-4" />
-                Lưu thay đổi
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Đang lưu...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Lưu thay đổi
+                  </>
+                )}
               </Button>
             </div>
           </CardContent>
