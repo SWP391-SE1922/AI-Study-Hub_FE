@@ -10,20 +10,17 @@ const documentsData = [
 ];
 
 export function DocumentsPage() {
-  // 1. Khai báo state lưu từ khóa tìm kiếm và danh mục môn học được chọn
+  // 1. State lưu từ khóa tìm kiếm và danh mục môn học được chọn
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Tất cả môn học');
 
-  // 2. Lấy danh sách các môn học duy nhất (unique categories) để tự động hiển thị vào bộ lọc dropdown
+  // 2. Trích xuất danh sách môn học tự động từ dữ liệu đầu vào
   const categories = ['Tất cả môn học', ...new Set(documentsData.map(doc => doc.category))];
 
-  // 3. Xử lý logic lọc dữ liệu kết hợp đồng thời cả 2 điều kiện
+  // 3. Logic xử lý lọc thời gian thực song song cả 2 bộ lọc
   const filteredDocuments = documentsData.filter((doc) => {
-    // Lọc theo tên (không phân biệt chữ hoa / chữ thường)
     const matchesSearch = doc.title.toLowerCase().includes(searchQuery.toLowerCase());
-    // Lọc theo môn học
     const matchesCategory = selectedCategory === 'Tất cả môn học' || doc.category === selectedCategory;
-
     return matchesSearch && matchesCategory;
   });
 
@@ -43,22 +40,26 @@ export function DocumentsPage() {
 
       {/* Bộ lọc & Tìm kiếm */}
       <div className="flex flex-col sm:flex-row gap-3">
+        {/* Ô Tìm kiếm */}
         <div className="relative flex-1">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
             type="text"
             placeholder="Tìm kiếm tài liệu..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)} // Cập nhật từ khóa khi gõ
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-card border border-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors"
           />
         </div>
+
+        {/* Bộ chọn môn học Dropdown */}
         <div className="flex gap-2">
-          {/* Custom Select Dropdown đồng bộ UI thay cho nút bấm tĩnh ban đầu */}
           <div className="relative">
+            {/* Đã bổ sung aria-label để giải quyết dứt điểm lỗi Accessible Name ở dòng 59 */}
             <select
+              aria-label="Chọn môn học cần lọc"
               value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)} // Cập nhật môn học khi chọn
+              onChange={(e) => setSelectedCategory(e.target.value)}
               className="appearance-none h-full bg-card text-foreground text-sm font-medium border border-border rounded-xl pl-4 pr-10 py-2.5 cursor-pointer focus:outline-none focus:ring-1 focus:ring-indigo-500 hover:bg-accent/50 transition-colors"
             >
               {categories.map((cat) => (
@@ -67,7 +68,7 @@ export function DocumentsPage() {
                 </option>
               ))}
             </select>
-            {/* Icon mũi tên chỉ xuống của dropdown */}
+            {/* Icon mũi tên tùy biến của dropdown */}
             <div className="absolute pointer-events-none right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
               <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20">
                 <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
@@ -81,12 +82,12 @@ export function DocumentsPage() {
         </div>
       </div>
 
-      {/* Số lượng tài liệu tìm thấy linh hoạt theo mảng đã lọc */}
+      {/* Hiển thị số lượng linh hoạt */}
       <p className="text-xs text-muted-foreground font-medium">
         Tìm thấy <span className="text-indigo-500 font-semibold">{filteredDocuments.length}</span> tài liệu
       </p>
 
-      {/* Danh sách tài liệu sau khi lọc */}
+      {/* Danh sách các thẻ tài liệu */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredDocuments.length > 0 ? (
           filteredDocuments.map((doc) => (
@@ -112,7 +113,7 @@ export function DocumentsPage() {
                 </div>
               </div>
 
-              {/* Khối Action Buttons */}
+              {/* Nhóm nút chức năng quản trị */}
               <div className="grid grid-cols-4 gap-1 border-t border-border pt-4 mt-5 text-muted-foreground text-xs">
                 <button type="button" className="flex flex-col items-center gap-1 py-1 hover:text-foreground transition-colors">
                   <Download className="w-4 h-4" />
@@ -134,9 +135,9 @@ export function DocumentsPage() {
             </div>
           ))
         ) : (
-          /* Trạng thái trống khi không tìm thấy kết quả phù hợp */
+          /* Trạng thái thông báo lịch sự khi tìm không ra kết quả */
           <div className="col-span-full py-12 text-center border border-dashed border-border rounded-2xl bg-card/50">
-            <p className="text-sm text-muted-foreground">Không tìm thấy tài liệu nào khớp với bộ lọc.</p>
+            <p className="text-sm text-muted-foreground">Không tìm thấy tài liệu nào phù hợp với từ khóa.</p>
           </div>
         )}
       </div>
