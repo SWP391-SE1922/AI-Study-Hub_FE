@@ -1,5 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import { useTheme } from 'next-themes'; // Thêm Hook quản lý theme
 import {
   Sparkles,
   BookOpen,
@@ -10,7 +11,9 @@ import {
   Search,
   ArrowRight,
   Check,
-  LogOut
+  LogOut,
+  Sun,  // Thêm icon Mặt trời
+  Moon  // Thêm icon Mặt trăng
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
@@ -94,6 +97,7 @@ const pricing = [
 
 export function LandingPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const { theme, setTheme } = useTheme(); // Khai báo điều khiển Sáng/Tối
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -122,12 +126,23 @@ export function LandingPage() {
               <a href="#pricing" className="text-sm hover:text-primary transition-colors">
                 Giá cả
               </a>
-              <a href="about" className="text-sm hover:text-primary transition-colors">
+              <Link to="/about" className="text-sm hover:text-primary transition-colors">
                 Về chúng tôi
-              </a>
+              </Link>
             </div>
 
             <div className="flex items-center gap-3">
+              {/* NÚT CHẾ ĐỘ SÁNG TỐI ĐÃ ĐƯỢC CHÈN LẠI Ở ĐÂY */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="w-9 h-9 text-muted-foreground hover:text-foreground rounded-xl"
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              >
+                <Sun className="w-4 h-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                <Moon className="absolute w-4 h-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+              </Button>
+
               {isLoggedIn ? (
                 <Button
                   variant="ghost"
@@ -272,8 +287,8 @@ export function LandingPage() {
                   </ul>
                   <Button
                     className={`w-full ${plan.popular
-                        ? 'bg-gradient-to-r from-primary to-secondary'
-                        : ''
+                      ? 'bg-gradient-to-r from-primary to-secondary'
+                      : ''
                       }`}
                     variant={plan.popular ? 'default' : 'outline'}
                   >
