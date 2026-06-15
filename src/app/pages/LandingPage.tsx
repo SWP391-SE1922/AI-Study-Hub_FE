@@ -122,7 +122,7 @@ export function LandingPage() {
               <a href="#pricing" className="text-sm hover:text-primary transition-colors">
                 Giá cả
               </a>
-              <a href="#about" className="text-sm hover:text-primary transition-colors">
+              <a href="about" className="text-sm hover:text-primary transition-colors">
                 Về chúng tôi
               </a>
             </div>
