@@ -8,13 +8,14 @@ import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
-import { DashboardPage }  from './pages/DashboardPage';
+import { DashboardPage } from './pages/DashboardPage';
 import { DocumentsPage } from './pages/documents/DocumentsPage';
 import { DocumentDetailPage } from './pages/documents/DocumentDetailPage';
 import { AIChat } from './pages/AIChat';
 import { ProfilePage } from './pages/ProfilePage';
+import { AboutPage } from './pages/AboutPage';
 
-// Layout
+// Layouts
 import { MainLayout } from './components/layout/MainLayout';
 import { AuthLayout } from './components/layout/AuthLayout';
 
@@ -53,7 +54,9 @@ export default function App() {
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
       <BrowserRouter>
         <Routes>
-          {/* Public */}
+
+          {/* ==================== 1. KHU VỰC CÔNG KHAI TUYỆT ĐỐI (ĐỘC LẬP TỰ DO) ==================== */}
+          {/* Trang chủ gốc - Giữ nguyên không bọc thêm bất kỳ layout nào gây đè footer */}
           <Route
             path="/"
             element={
@@ -65,7 +68,11 @@ export default function App() {
             }
           />
 
-          {/* Auth */}
+          {/* Trang Về chúng tôi độc lập hoàn toàn với MainLayout (Không có Sidebar dọc) */}
+          <Route path="/about" element={<AboutPage />} />
+
+
+          {/* ==================== 2. KHU VỰC ĐĂNG NHẬP / ĐĂNG KÝ ==================== */}
           <Route element={<AuthLayout />}>
             <Route
               path="/login"
@@ -77,7 +84,6 @@ export default function App() {
                 )
               }
             />
-
             <Route
               path="/register"
               element={
@@ -88,14 +94,11 @@ export default function App() {
                 )
               }
             />
-
-            <Route
-              path="/forgot-password"
-              element={<ForgotPasswordPage />}
-            />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           </Route>
 
-          {/* Protected */}
+
+          {/* ==================== 3. KHU VỰC QUẢN TRỊ ADMIN (CÓ SIDEBAR MENU TRÁI) ==================== */}
           <Route element={<ProtectedWrapper isAuthenticated={isAuthenticated} />}>
             <Route element={<MainLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
