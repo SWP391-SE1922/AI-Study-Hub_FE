@@ -16,16 +16,12 @@ export function AdminLayout() {
     window.location.href = '/';
   };
 
-  // Menu khớp chính xác với các file admin thực tế
   const adminMenuItems = [
     { path: '/admin/dashboard', label: 'Dashboard Admin', icon: LayoutDashboard },
     { path: '/admin/user', label: 'Quản lý User', icon: Users },
     { path: '/admin/document', label: 'Quản lý Tài liệu', icon: FileText },
     { path: '/admin/category', label: 'Quản lý Danh mục', icon: Tag },
-    { path: '/admin/subject', label: 'Quản lý Môn học', icon: BookOpen },
-    { path: '/admin/product', label: 'Quản lý Sản phẩm', icon: ShoppingBag },
     { path: '/admin/aichat', label: 'AI Chat Admin', icon: MessageSquare },
-    { path: '/documents', label: 'Trang Học sinh', icon: LayoutDashboard },
   ];
 
   return (

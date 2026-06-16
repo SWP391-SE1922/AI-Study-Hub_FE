@@ -18,9 +18,7 @@ import { AdminDashboardPage } from './pages/admin/adminDashboardPage';
 import { UserPage } from './pages/admin/adminUser';
 import { DocumentPage } from './pages/admin/adminDocument';
 import { AIChatPage } from './pages/admin/adminAIChat';
-import { AdminProductPage } from './pages/admin/adminProduct';
 import { CategoryPage } from './pages/admin/adminCategory';
-import { SubjectPage } from './pages/admin/adminSubject';
 
 // Layout
 import { MainLayout } from './components/layout/MainLayout';
@@ -127,8 +125,6 @@ export default function App() {
             <Route path="user" element={<UserPage />} />
             <Route path="document" element={<DocumentPage />} />
             <Route path="category" element={<CategoryPage />} />
-            <Route path="subject" element={<SubjectPage />} />
-            <Route path="product" element={<AdminProductPage />} />
             <Route path="aichat" element={<AIChatPage />} />
           </Route>
 
