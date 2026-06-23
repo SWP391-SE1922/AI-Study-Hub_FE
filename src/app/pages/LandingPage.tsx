@@ -103,6 +103,8 @@ export function LandingPage() {
   const handleLogout = () => {
     setIsLoggedIn(false);
     localStorage.removeItem('authToken');
+    localStorage.removeItem('isAuthenticated');
+    localStorage.removeItem('user');
     navigate('/');
   };
 

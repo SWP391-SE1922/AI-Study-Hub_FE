@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff, User, Mail, Lock } from 'lucide-react';
 import { toast } from 'sonner';
+import { register } from '../../services/api';
 
 export function RegisterPage() {
   const navigate = useNavigate();
@@ -26,12 +27,15 @@ export function RegisterPage() {
 
     setLoading(true);
 
-    // Giả lập đăng ký thành công
-    setTimeout(() => {
-      toast.success('Đăng ký thành công!');
+    try {
+      await register(formData.name, formData.email, formData.password);
+      toast.success('Đăng ký thành công! Bạn có thể đăng nhập ngay.');
       navigate('/login');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Không thể đăng ký');
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -82,7 +86,7 @@ export function RegisterPage() {
             <input
               type="email"
               required
-              placeholder="sellostore@company.com"
+              placeholder="sv1@gmail.com"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               className="w-full pl-10 pr-4 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-600 focus:border-transparent transition-all text-sm placeholder:text-slate-400 font-medium shadow-sm"
@@ -150,7 +154,7 @@ export function RegisterPage() {
           disabled={loading}
           className="w-full mt-4 py-2.5 px-4 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-bold rounded-lg shadow-md hover:shadow-lg transition-all text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 disabled:opacity-70"
         >
-          {loading ? 'Registering...' : 'Register Now'}
+          {loading ? 'Đang đăng ký...' : 'Register Now'}
         </button>
       </form>
 
