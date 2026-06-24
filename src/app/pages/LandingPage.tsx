@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
+import bannerImg from "../../assets/image/banner.png";
 
 const features = [
   {
@@ -136,19 +137,29 @@ export function LandingPage() {
           </div>
         </div>
       </nav>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+        <div className="relative w-full aspect-[21/9] sm:aspect-[2.4/1] rounded-2xl overflow-hidden shadow-lg border border-slate-100 dark:border-slate-800">
+          <img
+            src={bannerImg}
+            alt="AI Study Hub Banner"
+            className="w-full h-full object-cover object-center select-none"
+            loading="eager"
+          />
+        </div>
+      </div>
 
       {/* 2. HERO SECTION (ĐÃ BỎ CÁC NÚT CTA & ĐỂ CÁC KHỐI SỐ LIỆU ĐI LIỀN MẠCH) */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-secondary/5 to-background" />
-        <div className="container mx-auto px-4 py-20 md:py-32 relative">
+        <div className="container mx-auto px-3 py-20 md:py-22 relative">
           <div className="max-w-4xl mx-auto text-center space-y-8">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-muted rounded-full text-sm">
-              <Sparkles className="w-4 h-4 text-primary" />
-              <span>Nền tảng quản lý tài liệu học tập thông minh</span>
+              <Sparkles className="w-10 h-10 text-primary" />
+              
             </div>
 
             <h1 className="text-4xl md:text-6xl font-bold leading-tight">
-              Học tập hiệu quả hơn với <br />
+              Chào mừng bạn đến với <br />
               <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">AI Study Hub</span>
             </h1>
 
@@ -238,7 +249,7 @@ export function LandingPage() {
             <p className="text-lg text-white/90">
               Tham gia cùng hàng ngàn sinh viên đang sử dụng AI Study Hub để học tập hiệu quả hơn
             </p>
-            
+
           </div>
         </div>
       </section>
