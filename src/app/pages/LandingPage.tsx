@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-import { useTheme } from 'next-themes'; // Thêm Hook quản lý theme
+import { useTheme } from 'next-themes';
 import {
   Sparkles,
   BookOpen,
@@ -10,10 +10,13 @@ import {
   Cloud,
   Search,
   ArrowRight,
-  Check,
   LogOut,
-  Sun,  // Thêm icon Mặt trời
-  Moon  // Thêm icon Mặt trăng
+  Sun,
+  Moon,
+  Users,
+  Target,
+  Award,
+  ShieldCheck
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
@@ -52,52 +55,33 @@ const features = [
 ];
 
 const stats = [
-  { value: '10,000+', label: 'Sinh viên' },
-  { value: '50,000+', label: 'Tài liệu' },
-  { value: '1M+', label: 'Lượt tải' },
-  { value: '99.9%', label: 'Uptime' }
+  { value: '10,000+', label: 'Sinh viên tin tưởng' },
+  { value: '50,000+', label: 'Tài liệu chia sẻ' },
+  { value: '100k+', label: 'Câu hỏi AI giải đáp' },
+  { value: '99.9%', label: 'Uptime hệ thống' }
 ];
 
-const pricing = [
+const values = [
   {
-    name: 'Free',
-    price: '0đ',
-    features: [
-      '5 GB lưu trữ',
-      '100 tài liệu',
-      'AI Chat cơ bản',
-      'Hỗ trợ community'
-    ]
+    icon: <Target className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />,
+    title: "Sứ mệnh định hướng",
+    description: "Đơn giản hóa việc quản lý tri thức học tập, giúp sinh viên tiếp cận tài liệu thông minh hơn thông qua sức mạnh của trí tuệ nhân tạo."
   },
   {
-    name: 'Pro',
-    price: '99,000đ/tháng',
-    popular: true,
-    features: [
-      '50 GB lưu trữ',
-      'Không giới hạn tài liệu',
-      'AI Chat nâng cao',
-      'Hỗ trợ ưu tiên',
-      'Tính năng nâng cao'
-    ]
+    icon: <Award className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />,
+    title: "Chất lượng hàng đầu",
+    description: "Mọi tài liệu lưu trữ và câu trả lời từ AI Chat đều được tối ưu hóa cấu trúc, mang lại độ chính xác cao nhất cho người học."
   },
   {
-    name: 'Team',
-    price: '299,000đ/tháng',
-    features: [
-      '200 GB lưu trữ',
-      'Không giới hạn tài liệu',
-      'AI Chat premium',
-      'Hỗ trợ 24/7',
-      'Quản lý team',
-      'Analytics'
-    ]
+    icon: <ShieldCheck className="w-6 h-6 text-amber-600 dark:text-amber-400" />,
+    title: "Bảo mật & Chia sẻ",
+    description: "Xây dựng môi trường chia sẻ học thuật an toàn, tôn trọng bản quyền cá nhân và nâng cao tinh thần cộng đồng sinh viên."
   }
 ];
 
 export function LandingPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const { theme, setTheme } = useTheme(); // Khai báo điều khiển Sáng/Tối
+  const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -109,32 +93,23 @@ export function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Navbar */}
+    <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
+
+      {/* 1. NAVBAR */}
       <nav className="sticky top-0 z-50 bg-card/80 backdrop-blur-lg border-b border-border">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
+            {/* Logo bên trái */}
             <div className="flex items-center gap-2">
               <div className="w-10 h-10 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center">
                 <Sparkles className="w-5 h-5 text-white" />
               </div>
-              <span className="text-xl font-bold">AI Study Hub</span>
+              <span className="text-xl font-bold tracking-tight">AI Study Hub</span>
             </div>
 
-            <div className="hidden md:flex items-center gap-6">
-              <a href="#features" className="text-sm hover:text-primary transition-colors">
-                Tính năng
-              </a>
-              <a href="#pricing" className="text-sm hover:text-primary transition-colors">
-                Giá cả
-              </a>
-              <Link to="/about" className="text-sm hover:text-primary transition-colors">
-                Về chúng tôi
-              </Link>
-            </div>
-
+            {/* Cụm nút chức năng bên phải */}
             <div className="flex items-center gap-3">
-              {/* NÚT CHẾ ĐỘ SÁNG TỐI ĐÃ ĐƯỢC CHÈN LẠI Ở ĐÂY */}
+              {/* Nút chuyển chế độ sáng tối */}
               <Button
                 variant="ghost"
                 size="icon"
@@ -146,23 +121,14 @@ export function LandingPage() {
               </Button>
 
               {isLoggedIn ? (
-                <Button
-                  variant="ghost"
-                  onClick={handleLogout}
-                  className="flex items-center gap-2"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Đăng xuất
+                <Button variant="ghost" onClick={handleLogout} className="flex items-center gap-2">
+                  <LogOut className="w-4 h-4" /> Đăng xuất
                 </Button>
               ) : (
                 <>
+                  {/* <Link to="/login"><Button variant="ghost">Đăng nhập</Button></Link> */}
                   <Link to="/login">
-                    <Button variant="ghost">Đăng nhập</Button>
-                  </Link>
-                  <Link to="/register">
-                    <Button className="bg-gradient-to-r from-primary to-secondary">
-                      Bắt đầu miễn phí
-                    </Button>
+                    <Button className="bg-gradient-to-r from-primary to-secondary">Đăng nhập</Button>
                   </Link>
                 </>
               )}
@@ -171,7 +137,7 @@ export function LandingPage() {
         </div>
       </nav>
 
-      {/* Hero Section */}
+      {/* 2. HERO SECTION (ĐÃ BỎ CÁC NÚT CTA & ĐỂ CÁC KHỐI SỐ LIỆU ĐI LIỀN MẠCH) */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-secondary/5 to-background" />
         <div className="container mx-auto px-4 py-20 md:py-32 relative">
@@ -182,37 +148,22 @@ export function LandingPage() {
             </div>
 
             <h1 className="text-4xl md:text-6xl font-bold leading-tight">
-              Học tập hiệu quả hơn với
-              <br />
-              <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                AI Study Hub
-              </span>
+              Học tập hiệu quả hơn với <br />
+              <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">AI Study Hub</span>
             </h1>
 
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
               Lưu trữ, tìm kiếm và học tập với sự hỗ trợ của AI. Mọi tài liệu học tập của bạn ở một nơi, an toàn và dễ dàng truy cập.
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link to="/register">
-                <Button size="lg" className="bg-gradient-to-r from-primary to-secondary text-lg h-12 px-8">
-                  Bắt đầu miễn phí
-                  <ArrowRight className="w-5 h-5 ml-2" />
-                </Button>
-              </Link>
-              <Button size="lg" variant="outline" className="text-lg h-12 px-8">
-                Xem demo
-              </Button>
-            </div>
-
-            {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 pt-12">
+            {/* Khối thống kê số liệu kết nối liền mạch ngay dưới đoạn text */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 pt-12 border-t border-border/40 mt-12">
               {stats.map((stat, index) => (
                 <div key={index}>
-                  <h3 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                  <h3 className="text-3xl md:text-4xl font-extrabold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
                     {stat.value}
                   </h3>
-                  <p className="text-sm text-muted-foreground mt-1">{stat.label}</p>
+                  <p className="text-xs text-muted-foreground mt-1 font-medium">{stat.label}</p>
                 </div>
               ))}
             </div>
@@ -220,27 +171,25 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* Features Section */}
-      <section id="features" className="py-20 bg-muted/30">
+      {/* 3. FEATURES SECTION (TÍNH NĂNG) */}
+      <section id="features" className="py-20 bg-muted/30 border-y border-border/50">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Tính năng nổi bật
-            </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Tất cả công cụ bạn cần để quản lý và học tập hiệu quả
+          <div className="text-center mb-16 space-y-2">
+            <h2 className="text-3xl md:text-4xl font-bold">Tính năng nổi bật</h2>
+            <p className="text-base text-muted-foreground max-w-2xl mx-auto">
+              Tất cả công cụ bạn cần để nâng cao và tối ưu tốc độ học tập
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((feature, index) => (
-              <Card key={index} className="border-border/50 hover:border-primary/50 transition-all hover:shadow-lg">
+              <Card key={index} className="border-border/50 hover:border-primary/50 transition-all hover:shadow-lg bg-card">
                 <CardContent className="p-6">
                   <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mb-4">
                     <feature.icon className="w-6 h-6 text-primary" />
                   </div>
                   <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
-                  <p className="text-muted-foreground">{feature.description}</p>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{feature.description}</p>
                 </CardContent>
               </Card>
             ))}
@@ -248,84 +197,54 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section id="pricing" className="py-20">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Bảng giá đơn giản
-            </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Chọn gói phù hợp với nhu cầu của bạn
-            </p>
-          </div>
+      {/* 4. ABOUT SECTION (GIỚI THIỆU THƯƠNG HIỆU & GIÁ TRỊ CỐT LÕI) */}
+      <section id="about" className="py-20">
+        <div className="container mx-auto px-4 space-y-16">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <div className="space-y-6">
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-900 rounded-full text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+                <Users className="w-3.5 h-3.5" /> Câu chuyện hành trình
+              </div>
+              <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
+                Hệ sinh thái kết nối tri thức sinh viên Việt Nam
+              </h2>
+              <p className="text-muted-foreground text-sm sm:text-base leading-relaxed">
+                Chúng tôi không chỉ dừng lại ở một kho chứa dữ liệu tĩnh. AI Study Hub sinh ra để đem trí tuệ nhân tạo tích hợp sâu vào từng trang tài liệu, bài giảng, hỗ trợ giải đáp trực tiếp 24/7 nhằm san sẻ gánh nặng học thuật, tối ưu hóa điểm số cho sinh viên.
+              </p>
+            </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {pricing.map((plan, index) => (
-              <Card
-                key={index}
-                className={`border-border/50 relative ${plan.popular ? 'border-primary shadow-xl scale-105' : ''
-                  }`}
-              >
-                {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                    <span className="bg-gradient-to-r from-primary to-secondary text-white text-sm px-4 py-1 rounded-full">
-                      Phổ biến nhất
-                    </span>
+            {/* Khối giá trị cốt lõi */}
+            <div className="space-y-4">
+              {values.map((item, idx) => (
+                <div key={idx} className="flex gap-4 p-4 bg-muted/40 rounded-xl border border-border/50">
+                  <div className="p-2.5 bg-background rounded-lg border h-fit">{item.icon}</div>
+                  <div>
+                    <h4 className="font-semibold text-base">{item.title}</h4>
+                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{item.description}</p>
                   </div>
-                )}
-                <CardContent className="p-8">
-                  <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
-                  <div className="mb-6">
-                    <span className="text-4xl font-bold">{plan.price}</span>
-                  </div>
-                  <ul className="space-y-3 mb-8">
-                    {plan.features.map((feature, idx) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                        <span className="text-sm">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <Button
-                    className={`w-full ${plan.popular
-                      ? 'bg-gradient-to-r from-primary to-secondary'
-                      : ''
-                      }`}
-                    variant={plan.popular ? 'default' : 'outline'}
-                  >
-                    Chọn gói {plan.name}
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
+      {/* 5. CTA SECTION */}
       <section className="py-20 bg-gradient-to-br from-primary to-secondary text-white relative overflow-hidden">
         <div className="absolute inset-0 bg-white/10 backdrop-blur-3xl" />
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-3xl mx-auto text-center space-y-6">
-            <h2 className="text-3xl md:text-4xl font-bold">
-              Sẵn sàng bắt đầu?
-            </h2>
+            <h2 className="text-3xl md:text-4xl font-bold">Sẵn sàng bắt đầu?</h2>
             <p className="text-lg text-white/90">
               Tham gia cùng hàng ngàn sinh viên đang sử dụng AI Study Hub để học tập hiệu quả hơn
             </p>
-            <Link to="/register">
-              <Button size="lg" variant="secondary" className="text-lg h-12 px-8">
-                Tạo tài khoản miễn phí
-                <ArrowRight className="w-5 h-5 ml-2" />
-              </Button>
-            </Link>
+            
           </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-12 bg-muted/30 border-t border-border">
+      {/* 6. FOOTER */}
+      <footer className="py-12 bg-card border-t border-border w-full">
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
@@ -340,15 +259,9 @@ export function LandingPage() {
             </p>
 
             <div className="flex items-center gap-6">
-              <a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">
-                Privacy
-              </a>
-              <a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">
-                Terms
-              </a>
-              <a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">
-                Contact
-              </a>
+              <a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">Privacy</a>
+              <a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">Terms</a>
+              <a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">Contact</a>
             </div>
           </div>
         </div>

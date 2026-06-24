@@ -14,7 +14,6 @@ import { DocumentsPage } from './pages/documents/DocumentsPage';
 import { DocumentDetailPage } from './pages/documents/DocumentDetailPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { ChatPage } from './pages/ChatPage';
-import { AboutPage } from './pages/AboutPage';
 import { AdminPage } from './pages/admin/AdminPage';
 import { CategoryPage } from './pages/admin/adminCategory';
 
@@ -82,7 +81,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={isAuthenticated ? <Navigate to={homePath} replace /> : <LandingPage />} />
-          <Route path="/about" element={<AboutPage />} />
+
 
           <Route element={<AuthLayout />}>
             <Route path="/login" element={isAuthenticated ? <Navigate to={homePath} replace /> : <LoginPage />} />
