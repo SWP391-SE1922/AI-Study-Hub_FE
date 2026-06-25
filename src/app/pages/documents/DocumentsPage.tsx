@@ -102,7 +102,7 @@ export function DocumentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // States dành cho bộ lọc và tìm kiếm ở danh sách chính
+  // States dành cho bộ lọc và tìm kiếm
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -114,8 +114,8 @@ export function DocumentsPage() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [file, setFile] = useState<File | null>(null);
-  const [uploadCategoryId, setUploadCategoryId] = useState('');
-  const [uploadSubjectId, setUploadSubjectId] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [subject, setSubject] = useState(''); // Chuỗi text nhập từ form upload công khai
   const [isPublic, setIsPublic] = useState(true);
 
   // Cơ chế Debounce hoãn gọi API khi người dùng đang gõ tìm kiếm chữ cái
@@ -127,7 +127,6 @@ export function DocumentsPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Tải danh sách Options (Danh mục & Môn học) cho các ô Dropdown bộ lọc và upload
   const loadOptions = useCallback(async () => {
     try {
       const [categoryData, subjectData] = await Promise.all([
@@ -138,25 +137,27 @@ export function DocumentsPage() {
       setCategories(categoryData);
       setSubjects(subjectData);
 
-      // Gán giá trị mặc định cho form upload nếu có data
-      if (categoryData.length > 0) setUploadCategoryId(categoryData[0].id);
-      if (subjectData.length > 0) setUploadSubjectId(subjectData[0].id);
+      setCategoryId((current) => current || categoryData[0]?.id || '');
     } catch (err) {
       console.error(err);
       toast.error(err instanceof Error ? err.message : 'Không thể tải danh mục và môn học');
     }
   }, []);
 
-  // Hàm tải danh sách tài liệu chính xác kết hợp Search + Category + Subject ổn định
   const loadDocuments = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
+      // Tìm đối tượng môn học đang chọn dựa trên ID để lấy ra thuộc tính .name (Dạng chữ)
+      const matchedSubjectObj = subjects.find((s) => s.id === selectedSubject);
+      const subjectTextQuery = matchedSubjectObj ? matchedSubjectObj.name : undefined;
+
       const result = await getDocuments({
         search: debouncedSearch.trim() || undefined,
         categoryId: selectedCategory !== 'All' ? selectedCategory : undefined,
-        subjectId: selectedSubject !== 'All' ? selectedSubject : undefined,
+        // FIX: Truyền tên môn học dạng chữ thay vì ID để khớp với dữ liệu input vừa chỉnh sửa
+        subject: selectedSubject !== 'All' ? subjectTextQuery : undefined, 
         limit: 50,
         sortBy: 'createdAt',
         sortOrder: 'desc',
@@ -176,7 +177,7 @@ export function DocumentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, selectedCategory, selectedSubject]);
+  }, [debouncedSearch, selectedCategory, selectedSubject, subjects]); // Bổ sung subjects vào dependencies
 
   useEffect(() => {
     loadOptions();
@@ -201,8 +202,8 @@ export function DocumentsPage() {
     setDescription('');
     setFile(null);
     setIsPublic(true);
-    setUploadCategoryId(categories[0]?.id || '');
-    setUploadSubjectId(subjects[0]?.id || '');
+    setCategoryId(categories[0]?.id || '');
+    setSubject('');
   };
 
   const handleUploadSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -223,8 +224,8 @@ export function DocumentsPage() {
       return;
     }
 
-    if (!uploadSubjectId) {
-      toast.error('Vui lòng chọn môn học hợp lệ.');
+    if (!subject.trim()) {
+      toast.error('Vui lòng nhập môn học.');
       return;
     }
 
@@ -236,9 +237,9 @@ export function DocumentsPage() {
       formData.append('title', title.trim());
       formData.append('description', description.trim());
       formData.append('isPublic', String(isPublic));
-      formData.append('subjectId', uploadSubjectId); // Đồng bộ gửi ID môn học lên API
+      formData.append('subject', subject.trim()); // Gửi chuỗi văn bản môn học lên API
 
-      if (uploadCategoryId) formData.append('categoryId', uploadCategoryId);
+      if (categoryId) formData.append('categoryId', categoryId);
 
       const headers: Record<string, string> = {
         Authorization: `Bearer ${getToken()}`,
@@ -320,7 +321,6 @@ export function DocumentsPage() {
         </div>
       )}
 
-      {/* THANH BỘ LỌC TÌM KIẾM TRÊN TRANG CHÍNH */}
       <div className="flex flex-col md:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -458,7 +458,6 @@ export function DocumentsPage() {
         </div>
       )}
 
-      {/* DIALOG FORM UPLOAD TÀI LIỆU (ĐÃ FIX CHUẨN ĐỔ DATA) */}
       <Dialog open={isUploadOpen} onOpenChange={handleUploadOpenChange}>
         <DialogContent className="sm:max-w-[500px] rounded-3xl p-6 border-border bg-background">
           <DialogHeader className="mb-4">
@@ -506,17 +505,18 @@ export function DocumentsPage() {
               />
             </div>
 
-            {/* FIX: ĐÃ ĐẢO ĐÚNG DỮ LIỆU ĐỔ VÀO DROPDOWN */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="category" className="text-sm font-semibold text-foreground">Danh mục *</Label>
                 <select
                   id="category"
-                  value={uploadCategoryId}
-                  onChange={(event) => setUploadCategoryId(event.target.value)}
+                  value={categoryId}
+                  onChange={(event) => setCategoryId(event.target.value)}
                   className="w-full bg-background border border-input rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring font-medium"
                 >
-                  {categories.map((category) => (
+                  {categories.length === 0 ? (
+                    <option value="">Chưa có danh mục</option>
+                  ) : categories.map((category) => (
                     <option key={category.id} value={category.id}>{category.name}</option>
                   ))}
                 </select>
@@ -524,18 +524,14 @@ export function DocumentsPage() {
 
               <div className="space-y-1.5">
                 <Label htmlFor="subject" className="text-sm font-semibold text-foreground">Môn học *</Label>
-                <select
+                <Input
                   id="subject"
-                  value={uploadSubjectId}
-                  onChange={(event) => setUploadSubjectId(event.target.value)}
-                  className="w-full bg-background border border-input rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring font-medium"
-                >
-                  {subjects.map((subjectItem) => (
-                    <option key={subjectItem.id} value={subjectItem.id}>
-                      {subjectItem.code ? `[${subjectItem.code}] ` : ''}{subjectItem.name}
-                    </option>
-                  ))}
-                </select>
+                  value={subject}
+                  onChange={(event) => setSubject(event.target.value)}
+                  placeholder="Ví dụ: Toán cao cấp, PRM392..."
+                  required
+                  className="rounded-xl"
+                />
               </div>
             </div>
 
