@@ -475,190 +475,137 @@ export function AdminPage() {
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            <Card className="xl:col-span-2 border-border/50 bg-white dark:bg-slate-900 shadow-sm">
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5 text-primary" />
-                  <CardTitle>Đường cao thấp tài liệu theo danh mục</CardTitle>
-                </div>
-                <CardDescription>
-                  Hiển thị dạng đường thẳng để thấy danh mục nào đang cao hoặc thấp hơn các danh mục còn lại.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <LineTrendChart
-                  chartId="category-documents"
-                  data={categoryLineData}
-                  valueLabel="tài liệu"
-                  loading={loading}
-                  emptyText="Chưa có dữ liệu tài liệu để vẽ biểu đồ."
-                />
-              </CardContent>
-            </Card>
-
-            <Card className="border-border/50 bg-white dark:bg-slate-900 shadow-sm">
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Users className="w-5 h-5 text-primary" />
-                  <CardTitle>Người dùng theo vai trò</CardTitle>
-                </div>
-                <CardDescription>Tỷ lệ tài khoản ADMIN, USER và GUEST.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {roleStats.map((item) => (
-                  <div key={item.role} className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">{item.role}</span>
-                      <span className="text-muted-foreground">{item.count} tài khoản</span>
-                    </div>
-                    <div className="h-3 rounded-full bg-muted overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500"
-                        style={{ width: `${Math.max((item.count / maxRoleCount) * 100, item.count ? 8 : 0)}%` }}
-                      />
-                    </div>
+            {/* Cột trái: 2 chart xếp dọc, chiếm 2/3 */}
+            <div className="xl:col-span-2 flex flex-col gap-6">
+              <Card className="border-border/50 bg-white dark:bg-slate-900 shadow-sm">
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="w-5 h-5 text-primary" />
+                    <CardTitle>Đường cao thấp tài liệu theo danh mục</CardTitle>
                   </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
+                  <CardDescription>
+                    Hiển thị dạng đường thẳng để thấy danh mục nào đang cao hoặc thấp hơn các danh mục còn lại.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <LineTrendChart
+                    chartId="category-documents"
+                    data={categoryLineData}
+                    valueLabel="tài liệu"
+                    loading={loading}
+                    emptyText="Chưa có dữ liệu tài liệu để vẽ biểu đồ."
+                  />
+                </CardContent>
+              </Card>
 
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            <Card className="border-border/50 bg-white dark:bg-slate-900 shadow-sm xl:col-span-2">
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-primary" />
-                  <CardTitle>Đường xu hướng tài liệu 7 ngày</CardTitle>
-                </div>
-                <CardDescription>Biểu đồ đường thẳng thể hiện ngày nào tải lên cao, ngày nào thấp.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <LineTrendChart
-                  chartId="upload-timeline"
-                  data={uploadLineData}
-                  valueLabel="tài liệu"
-                  loading={loading}
-                  emptyText="Chưa có dữ liệu tải lên trong 7 ngày gần đây."
-                />
-              </CardContent>
-            </Card>
-
-            <Card className="border-border/50 bg-white dark:bg-slate-900 shadow-sm">
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="w-5 h-5 text-primary" />
-                  <CardTitle>Tình trạng cần chú ý</CardTitle>
-                </div>
-                <CardDescription>Các mục admin nên kiểm tra định kỳ.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 p-3">
-                  <span className="text-sm text-muted-foreground">User chưa xác thực</span>
-                  <Badge variant="secondary">{users.length - verifiedUsers}</Badge>
-                </div>
-                <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 p-3">
-                  <span className="text-sm text-muted-foreground">Tài liệu chưa phân loại</span>
-                  <Badge variant={unclassifiedDocuments ? 'destructive' : 'secondary'}>{unclassifiedDocuments}</Badge>
-                </div>
-                <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 p-3">
-                  <span className="text-sm text-muted-foreground">Tài liệu riêng tư</span>
-                  <Badge variant="secondary">{privateDocuments}</Badge>
-                </div>
-                <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 p-3">
-                  <span className="text-sm text-muted-foreground">Tài khoản admin</span>
-                  <Badge>{adminUsers}</Badge>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-border/50 bg-white dark:bg-slate-900 shadow-sm">
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Database className="w-5 h-5 text-primary" />
-                  <CardTitle>Thao tác nhanh</CardTitle>
-                </div>
-                <CardDescription>Đi nhanh đến các khu vực quản trị chính.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button variant="outline" className="w-full justify-start gap-2" onClick={() => navigate('/admin/documents')}>
-                  <FileText className="w-4 h-4" />
-                  Mở quản lý tài liệu
-                </Button>
-                <Button variant="outline" className="w-full justify-start gap-2" onClick={() => navigate('/admin/users')}>
-                  <UserCheck className="w-4 h-4" />
-                  Mở quản lý user
-                </Button>
-                <Button variant="outline" className="w-full justify-start gap-2" onClick={() => navigate('/admin/category')}>
-                  <FolderOpen className="w-4 h-4" />
-                  Mở quản lý danh mục
-                </Button>
-                <Button variant="outline" className="w-full justify-start gap-2" onClick={() => navigate('/admin/aichat')}>
-                  <MessageSquare className="w-4 h-4" />
-                  Xem AI Chat Admin
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <Card className="border-border/50 bg-white dark:bg-slate-900 shadow-sm">
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <CalendarDays className="w-5 h-5 text-primary" />
-                  <CardTitle>Tài liệu mới nhất</CardTitle>
-                </div>
-                <CardDescription>5 tài liệu vừa được tải lên hệ thống.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {recentDocuments.map((doc) => (
-                  <div key={doc.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/20 p-3">
-                    <div className="min-w-0">
-                      <p className="font-medium truncate">{doc.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {doc.category?.name || doc.subjectRef?.name || doc.subject || 'Chưa phân loại'} · {formatDate(doc.createdAt)}
-                      </p>
-                    </div>
-                    <Badge variant="secondary" className="shrink-0">{formatFileSize(doc.fileSize)}</Badge>
+              <Card className="border-border/50 bg-white dark:bg-slate-900 shadow-sm">
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-primary" />
+                    <CardTitle>Đường xu hướng tài liệu 7 ngày</CardTitle>
                   </div>
-                ))}
-                {!recentDocuments.length && (
-                  <p className="text-center text-muted-foreground py-8">{loading ? 'Đang tải...' : 'Chưa có tài liệu.'}</p>
-                )}
-              </CardContent>
-            </Card>
+                  <CardDescription>Biểu đồ đường thẳng thể hiện ngày nào tải lên cao, ngày nào thấp.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <LineTrendChart
+                    chartId="upload-timeline"
+                    data={uploadLineData}
+                    valueLabel="tài liệu"
+                    loading={loading}
+                    emptyText="Chưa có dữ liệu tải lên trong 7 ngày gần đây."
+                  />
+                </CardContent>
+              </Card>
+            </div>
 
-            <Card className="border-border/50 bg-white dark:bg-slate-900 shadow-sm">
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-primary" />
-                  <CardTitle>Tài liệu tải nhiều</CardTitle>
-                </div>
-                <CardDescription>Top tài liệu có lượt tải cao nhất.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {topDocuments.map((doc, index) => (
-                  <div key={doc.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/20 p-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">
-                        {index + 1}
-                      </div>
+            {/* Cột phải: 3 card xếp dọc, chiếm 1/3 */}
+            <div className="flex flex-col gap-6">
+              <Card className="border-border/50 bg-white dark:bg-slate-900 shadow-sm">
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <CalendarDays className="w-5 h-5 text-primary" />
+                    <CardTitle>Tài liệu mới nhất</CardTitle>
+                  </div>
+                  <CardDescription>5 tài liệu vừa được tải lên hệ thống.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {recentDocuments.map((doc) => (
+                    <div key={doc.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/20 p-3">
                       <div className="min-w-0">
                         <p className="font-medium truncate">{doc.title}</p>
-                        <p className="text-xs text-muted-foreground">{formatFileSize(doc.fileSize)}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {doc.category?.name || doc.subjectRef?.name || doc.subject || 'Chưa phân loại'} · {formatDate(doc.createdAt)}
+                        </p>
                       </div>
+                      <Badge variant="secondary" className="shrink-0">{formatFileSize(doc.fileSize)}</Badge>
                     </div>
-                    <Badge className="shrink-0">{doc.downloadCount || 0} lượt tải</Badge>
+                  ))}
+                  {!recentDocuments.length && (
+                    <p className="text-center text-muted-foreground py-8">{loading ? 'Đang tải...' : 'Chưa có tài liệu.'}</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/50 bg-white dark:bg-slate-900 shadow-sm">
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-primary" />
+                    <CardTitle>Tài liệu tải nhiều</CardTitle>
                   </div>
-                ))}
-                {!topDocuments.length && (
-                  <p className="text-center text-muted-foreground py-8">{loading ? 'Đang tải...' : 'Chưa có tài liệu.'}</p>
-                )}
-              </CardContent>
-            </Card>
+                  <CardDescription>Top tài liệu có lượt tải cao nhất.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {topDocuments.map((doc, index) => (
+                    <div key={doc.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/20 p-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">
+                          {index + 1}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">{doc.title}</p>
+                          <p className="text-xs text-muted-foreground">{formatFileSize(doc.fileSize)}</p>
+                        </div>
+                      </div>
+                      <Badge className="shrink-0">{doc.downloadCount || 0} lượt tải</Badge>
+                    </div>
+                  ))}
+                  {!topDocuments.length && (
+                    <p className="text-center text-muted-foreground py-8">{loading ? 'Đang tải...' : 'Chưa có tài liệu.'}</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/50 bg-white dark:bg-slate-900 shadow-sm">
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <Database className="w-5 h-5 text-primary" />
+                    <CardTitle>Thao tác nhanh</CardTitle>
+                  </div>
+                  <CardDescription>Đi nhanh đến các khu vực quản trị chính.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Button variant="outline" className="w-full justify-start gap-2" onClick={() => navigate('/admin/documents')}>
+                    <FileText className="w-4 h-4" />
+                    Mở quản lý tài liệu
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start gap-2" onClick={() => navigate('/admin/users')}>
+                    <UserCheck className="w-4 h-4" />
+                    Mở quản lý user
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start gap-2" onClick={() => navigate('/admin/category')}>
+                    <FolderOpen className="w-4 h-4" />
+                    Mở quản lý danh mục
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start gap-2" onClick={() => navigate('/admin/aichat')}>
+                    <MessageSquare className="w-4 h-4" />
+                    Xem AI Chat Admin
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
       )}
-
       {pageMode === 'users' && (
         <Card className="border-border/50 bg-white dark:bg-slate-900 shadow-sm">
           <CardHeader>
