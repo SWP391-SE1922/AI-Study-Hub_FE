@@ -5,6 +5,8 @@ import {
   AlertCircle,
   BarChart3,
   CalendarDays,
+  ChevronLeft,
+  ChevronRight,
   Database,
   FileText,
   FolderOpen,
@@ -193,6 +195,13 @@ export function AdminPage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [userPage, setUserPage] = useState(1);
+  const [docPage, setDocPage] = useState(1); 
+  const [docSearch, setDocSearch] = useState('');
+  const [docTypeFilter, setDocTypeFilter] = useState('');
+  const [docMaxSize, setDocMaxSize] = useState(100);
+  const USER_PAGE_SIZE = 10;
+  const DOC_PAGE_SIZE = 10;
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -244,6 +253,8 @@ export function AdminPage() {
     setDocuments(nextDocuments);
     setChatCount(nextChatCount);
     setCurrentUser(nextCurrentUser);
+    setUserPage(1);
+    setDocPage(1);
     setLoading(false);
   };
 
@@ -340,6 +351,37 @@ export function AdminPage() {
   );
 
   const recentDocuments = useMemo(() => documents.slice(0, 5), [documents]);
+  const totalUserPages = Math.max(1, Math.ceil(users.length / USER_PAGE_SIZE));
+  const paginatedUsers = useMemo(
+  () => users.slice((userPage - 1) * USER_PAGE_SIZE, userPage * USER_PAGE_SIZE),
+  [users, userPage],
+  );
+  const filteredDocuments = useMemo(() => {
+    return documents.filter((doc) => {
+      const name = doc.title?.toLowerCase() || '';
+      const ext = doc.title?.split('.').pop() || '';
+      const size = Number(doc.fileSize || 0) / (1024 * 1024);
+      const matchSearch = !docSearch || name.includes(docSearch.toLowerCase());
+      const matchType = !docTypeFilter || ext.toLowerCase().includes(docTypeFilter.toLowerCase());
+      const matchSize = size <= docMaxSize;
+      return matchSearch && matchType && matchSize;
+    });
+  }, [documents, docSearch, docTypeFilter, docMaxSize]);
+
+  const totalDocPages = Math.max(1, Math.ceil(filteredDocuments.length / DOC_PAGE_SIZE));
+  const paginatedDocuments = useMemo(
+    () => filteredDocuments.slice((docPage - 1) * DOC_PAGE_SIZE, docPage * DOC_PAGE_SIZE),
+    [filteredDocuments, docPage],
+  );
+
+  const docTypes = useMemo(() => {
+    const types = new Set<string>();
+    documents.forEach((doc) => {
+      const ext = doc.title?.split('.').pop() || '';
+      if (ext) types.add(ext.toLowerCase());
+    });
+    return Array.from(types).sort();
+  }, [documents]);
   const topDocuments = useMemo(
     () => [...documents].sort((a, b) => Number(b.downloadCount || 0) - Number(a.downloadCount || 0)).slice(0, 5),
     [documents],
@@ -574,34 +616,6 @@ export function AdminPage() {
                   )}
                 </CardContent>
               </Card>
-
-              <Card className="border-border/50 bg-white dark:bg-slate-900 shadow-sm">
-                <CardHeader>
-                  <div className="flex items-center gap-2">
-                    <Database className="w-5 h-5 text-primary" />
-                    <CardTitle>Thao tác nhanh</CardTitle>
-                  </div>
-                  <CardDescription>Đi nhanh đến các khu vực quản trị chính.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Button variant="outline" className="w-full justify-start gap-2" onClick={() => navigate('/admin/documents')}>
-                    <FileText className="w-4 h-4" />
-                    Mở quản lý tài liệu
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start gap-2" onClick={() => navigate('/admin/users')}>
-                    <UserCheck className="w-4 h-4" />
-                    Mở quản lý user
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start gap-2" onClick={() => navigate('/admin/category')}>
-                    <FolderOpen className="w-4 h-4" />
-                    Mở quản lý danh mục
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start gap-2" onClick={() => navigate('/admin/aichat')}>
-                    <MessageSquare className="w-4 h-4" />
-                    Xem AI Chat Admin
-                  </Button>
-                </CardContent>
-              </Card>
             </div>
           </div>
         </div>
@@ -610,7 +624,7 @@ export function AdminPage() {
         <Card className="border-border/50 bg-white dark:bg-slate-900 shadow-sm">
           <CardHeader>
             <CardTitle>Quản lý người dùng</CardTitle>
-            <CardDescription>Danh sách tài khoản thật trong bảng users.</CardDescription>
+            <CardDescription>Danh sách tài khoản.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -627,7 +641,7 @@ export function AdminPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((user) => (
+                {paginatedUsers.map((user) => (
                     <TableRow key={user.id}>
                       <TableCell>
                         <div className="flex items-center gap-3">
@@ -683,17 +697,101 @@ export function AdminPage() {
                 </TableBody>
               </Table>
             </div>
+             {users.length > 0 && (
+              <div className="flex items-center justify-between mt-4 px-1">
+                <p className="text-sm text-muted-foreground">
+                  {(userPage - 1) * USER_PAGE_SIZE + 1}–{Math.min(userPage * USER_PAGE_SIZE, users.length)}/{users.length} người dùng
+                </p>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    disabled={userPage === 1}
+                    onClick={() => setUserPage((p) => Math.max(1, p - 1))}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  {Array.from({ length: totalUserPages }, (_, i) => i + 1).map((page) => (
+                    <Button
+                      key={page}
+                      variant={page === userPage ? 'default' : 'outline'}
+                      size="sm"
+                      className="h-8 w-8 p-0 text-xs"
+                      onClick={() => setUserPage(page)}
+                    >
+                      {page}
+                    </Button>
+                  ))}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    disabled={userPage === totalUserPages}
+                    onClick={() => setUserPage((p) => Math.min(totalUserPages, p + 1))}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                      </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
-
       {pageMode === 'documents' && (
         <Card className="border-border/50 bg-white dark:bg-slate-900 shadow-sm">
           <CardHeader>
             <CardTitle>Quản lý tài liệu</CardTitle>
-            <CardDescription>Danh sách tài liệu mới nhất từ backend. Admin có thể xóa tài liệu tại đây.</CardDescription>
+            <CardDescription>Danh sách tài liệu.</CardDescription>
           </CardHeader>
           <CardContent>
+            {/* Filter bar */}
+            <div className="space-y-3 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tên tài liệu</label>
+                  <input
+                    type="text"
+                    placeholder="Tìm theo tên..."
+                    value={docSearch}
+                    onChange={(e) => { setDocSearch(e.target.value); setDocPage(1); }}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Loại tệp</label>
+                  <select
+                    value={docTypeFilter}
+                    onChange={(e) => { setDocTypeFilter(e.target.value); setDocPage(1); }}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                  >
+                    <option value="">Tất cả loại</option>
+                    {docTypes.map((t) => (
+                      <option key={t} value={t}>{t.toUpperCase()}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <span>Dung lượng tối đa</span>
+                  <span className="text-primary">≤ {docMaxSize} MB</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">0 MB</span>
+                  <input
+                    type="range"
+                    min={1}
+                    max={100}
+                    value={docMaxSize}
+                    onChange={(e) => { setDocMaxSize(Number(e.target.value)); setDocPage(1); }}
+                    className="w-full accent-primary"
+                  />
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">100 MB</span>
+                </div>
+              </div>
+            </div>
+
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -708,7 +806,7 @@ export function AdminPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {documents.map((doc) => (
+                 {paginatedDocuments.map((doc) => (
                     <TableRow key={doc.id}>
                       <TableCell className="font-medium max-w-[320px] truncate">{doc.title}</TableCell>
                       <TableCell className="text-muted-foreground">
@@ -719,20 +817,31 @@ export function AdminPage() {
                       <TableCell className="text-muted-foreground">{doc.downloadCount || 0}</TableCell>
                       <TableCell className="text-muted-foreground">{formatDate(doc.createdAt)}</TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          disabled={actionLoading === doc.id}
-                          onClick={() => handleDeleteDocument(doc)}
-                        >
-                          <Trash2 className="w-4 h-4 mr-1" />
-                          Xóa
-                        </Button>
+                        <div className="flex flex-col items-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-primary hover:text-primary"
+                           onClick={() => navigate(`/admin/documents/${doc.id}`)}
+                          >
+                            <FileText className="w-4 h-4 mr-1" />
+                            Xem
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            disabled={actionLoading === doc.id}
+                            onClick={() => handleDeleteDocument(doc)}
+                          >
+                            <Trash2 className="w-4 h-4 mr-1" />
+                            Xóa
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
-                  {!documents.length && (
+                 {!filteredDocuments.length && (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                         {loading ? 'Đang tải tài liệu...' : 'Chưa có tài liệu.'}
@@ -742,6 +851,29 @@ export function AdminPage() {
                 </TableBody>
               </Table>
             </div>
+             {filteredDocuments.length > 0 && (
+              <div className="flex items-center justify-between mt-4 px-1">
+                <p className="text-sm text-muted-foreground">
+                  {(docPage - 1) * DOC_PAGE_SIZE + 1}–{Math.min(docPage * DOC_PAGE_SIZE, filteredDocuments.length)}/{filteredDocuments.length} tài liệu
+                </p>
+                <div className="flex items-center gap-1">
+                  <Button variant="outline" size="sm" className="h-8 w-8 p-0"
+                    disabled={docPage === 1} onClick={() => setDocPage((p) => Math.max(1, p - 1))}>
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  {Array.from({ length: totalDocPages }, (_, i) => i + 1).map((page) => (
+                    <Button key={page} variant={page === docPage ? 'default' : 'outline'}
+                      size="sm" className="h-8 w-8 p-0 text-xs" onClick={() => setDocPage(page)}>
+                      {page}
+                    </Button>
+                  ))}
+                  <Button variant="outline" size="sm" className="h-8 w-8 p-0"
+                    disabled={docPage === totalDocPages} onClick={() => setDocPage((p) => Math.min(totalDocPages, p + 1))}>
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+              )}
           </CardContent>
         </Card>
       )}
@@ -761,6 +893,7 @@ export function AdminPage() {
                     <MessageSquare className="w-6 h-6 text-primary" />
                   </div>
                 </div>
+                
               </CardContent>
             </Card>
 
