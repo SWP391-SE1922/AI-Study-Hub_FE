@@ -574,34 +574,6 @@ export function AdminPage() {
                   )}
                 </CardContent>
               </Card>
-
-              <Card className="border-border/50 bg-white dark:bg-slate-900 shadow-sm">
-                <CardHeader>
-                  <div className="flex items-center gap-2">
-                    <Database className="w-5 h-5 text-primary" />
-                    <CardTitle>Thao tác nhanh</CardTitle>
-                  </div>
-                  <CardDescription>Đi nhanh đến các khu vực quản trị chính.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Button variant="outline" className="w-full justify-start gap-2" onClick={() => navigate('/admin/documents')}>
-                    <FileText className="w-4 h-4" />
-                    Mở quản lý tài liệu
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start gap-2" onClick={() => navigate('/admin/users')}>
-                    <UserCheck className="w-4 h-4" />
-                    Mở quản lý user
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start gap-2" onClick={() => navigate('/admin/category')}>
-                    <FolderOpen className="w-4 h-4" />
-                    Mở quản lý danh mục
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start gap-2" onClick={() => navigate('/admin/aichat')}>
-                    <MessageSquare className="w-4 h-4" />
-                    Xem AI Chat Admin
-                  </Button>
-                </CardContent>
-              </Card>
             </div>
           </div>
         </div>
