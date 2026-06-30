@@ -60,6 +60,15 @@ function getDocumentCategory(doc: DocumentItem) {
   );
 }
 
+// Glow shadow dùng chung cho các card — ánh sáng xanh dương (sky/cyan), mềm và nổi bật hơn shadow xám mặc định.
+const glowCard =
+  'border-sky-500/10 dark:border-sky-400/10 bg-white dark:bg-slate-900 ' +
+  'shadow-[0_0_0_1px_rgba(56,189,248,0.06),0_8px_30px_-8px_rgba(56,189,248,0.35)] ' +
+  'dark:shadow-[0_0_0_1px_rgba(56,189,248,0.08),0_8px_35px_-6px_rgba(56,189,248,0.25)] ' +
+  'hover:shadow-[0_0_0_1px_rgba(56,189,248,0.12),0_12px_45px_-8px_rgba(56,189,248,0.55)] ' +
+  'dark:hover:shadow-[0_0_0_1px_rgba(56,189,248,0.18),0_12px_45px_-8px_rgba(56,189,248,0.45)] ' +
+  'transition-shadow duration-300';
+
 export function DashboardPage() {
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
@@ -146,21 +155,24 @@ export function DashboardPage() {
       value: String(documents.length),
       change: loading ? 'Đang tải' : 'Từ backend',
       icon: FileText,
-      color: 'text-blue-600',
+      color: 'text-sky-500',
+      iconBg: 'bg-sky-50 dark:bg-sky-500/10',
     },
     {
       title: 'Danh mục',
       value: String(categories.length),
       change: 'Tổng số danh mục',
       icon: FolderOpen,
-      color: 'text-green-600',
+      color: 'text-emerald-500',
+      iconBg: 'bg-emerald-50 dark:bg-emerald-500/10',
     },
     {
       title: 'Dung lượng đã dùng',
       value: formatFileSize(usedStorage),
       change: `/ ${formatFileSize(storageLimit)}`,
       icon: TrendingUp,
-      color: 'text-orange-600',
+      color: 'text-orange-500',
+      iconBg: 'bg-orange-50 dark:bg-orange-500/10',
     },
   ];
 
@@ -183,7 +195,7 @@ export function DashboardPage() {
         {stats.map((stat, index) => (
           <Card
             key={index}
-            className="border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm"
+            className={glowCard}
           >
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -201,7 +213,7 @@ export function DashboardPage() {
                   </p>
                 </div>
 
-                <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800 rounded-xl flex items-center justify-center">
+                <div className={`w-12 h-12 ${stat.iconBg} rounded-xl flex items-center justify-center`}>
                   <stat.icon
                     className={`w-6 h-6 ${stat.color}`}
                   />
@@ -212,10 +224,12 @@ export function DashboardPage() {
         ))}
       </div>
 
-      <Card className="border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+      <Card className={glowCard}>
         <CardHeader>
           <CardTitle className="text-slate-900 dark:text-white flex items-center gap-2">
-            <HardDrive className="w-5 h-5" />
+            <span className="w-9 h-9 rounded-lg bg-sky-50 dark:bg-sky-500/10 flex items-center justify-center">
+              <HardDrive className="w-5 h-5 text-sky-500" />
+            </span>
             Dung lượng lưu trữ
           </CardTitle>
 
@@ -228,7 +242,7 @@ export function DashboardPage() {
         <CardContent>
           <Progress
             value={storagePercent}
-            className="h-2 bg-slate-100 dark:bg-slate-800"
+            className="h-2 bg-slate-100 dark:bg-slate-800 [&>div]:bg-gradient-to-r [&>div]:from-sky-400 [&>div]:to-indigo-500"
           />
 
           <p className="text-sm text-muted-foreground mt-2">
@@ -244,7 +258,7 @@ export function DashboardPage() {
         </CardContent>
       </Card>
 
-      <Card className="border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+      <Card className={glowCard}>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle className="text-slate-900 dark:text-white">
@@ -260,7 +274,7 @@ export function DashboardPage() {
             <Button
               variant="ghost"
               size="sm"
-              className="hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="hover:bg-sky-50 dark:hover:bg-sky-500/10 hover:text-sky-600 dark:hover:text-sky-400"
             >
               Xem tất cả
             </Button>
@@ -274,10 +288,13 @@ export function DashboardPage() {
                 <Link
                   key={doc.id}
                   to={`/documents/${doc.id}`}
-                  className="flex items-center gap-4 p-4 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors border border-slate-100/50 dark:border-slate-800"
+                  className="flex items-center gap-4 p-4 rounded-xl border border-slate-100/50 dark:border-slate-800
+                  hover:bg-sky-50/50 dark:hover:bg-sky-500/5
+                  hover:shadow-[0_0_25px_-10px_rgba(56,189,248,0.6)]
+                  transition-all duration-300"
                 >
-                  <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-950/40 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <FileText className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                  <div className="w-10 h-10 bg-sky-50 dark:bg-sky-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <FileText className="w-5 h-5 text-sky-500" />
                   </div>
 
                   <div className="flex-1 min-w-0">

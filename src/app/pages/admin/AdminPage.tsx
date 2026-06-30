@@ -82,6 +82,15 @@ function getDateKey(value?: string) {
   return date.toISOString().slice(0, 10);
 }
 
+// Glow shadow dùng chung cho các card — ánh sáng xanh dương (sky/cyan), đồng bộ với Dashboard người dùng.
+const glowCard =
+  'border-sky-500/10 dark:border-sky-400/10 bg-white dark:bg-slate-900 ' +
+  'shadow-[0_0_0_1px_rgba(56,189,248,0.06),0_8px_30px_-8px_rgba(56,189,248,0.35)] ' +
+  'dark:shadow-[0_0_0_1px_rgba(56,189,248,0.08),0_8px_35px_-6px_rgba(56,189,248,0.25)] ' +
+  'hover:shadow-[0_0_0_1px_rgba(56,189,248,0.12),0_12px_45px_-8px_rgba(56,189,248,0.55)] ' +
+  'dark:hover:shadow-[0_0_0_1px_rgba(56,189,248,0.18),0_12px_45px_-8px_rgba(56,189,248,0.45)] ' +
+  'transition-shadow duration-300';
+
 type LineChartPoint = {
   key: string;
   label: string;
@@ -133,12 +142,12 @@ function LineTrendChart({
         <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="h-64 w-full overflow-visible" role="img">
           <defs>
             <linearGradient id={`${chartId}-line`} x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="#4f46e5" />
+              <stop offset="0%" stopColor="#0ea5e9" />
               <stop offset="100%" stopColor="#9333ea" />
             </linearGradient>
             <linearGradient id={`${chartId}-area`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.24" />
-              <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0.02" />
+              <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.24" />
+              <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.02" />
             </linearGradient>
           </defs>
 
@@ -175,7 +184,7 @@ function LineTrendChart({
           {points.map((point) => (
             <g key={point.key}>
               <circle cx={point.x} cy={point.y} r="7" className="fill-background" stroke={`url(#${chartId}-line)`} strokeWidth="4" />
-              <circle cx={point.x} cy={point.y} r="3" fill="#7c3aed" />
+              <circle cx={point.x} cy={point.y} r="3" fill="#0ea5e9" />
               <text x={point.x} y={point.y - 14} textAnchor="middle" className="fill-foreground text-[12px] font-semibold">
                 {point.value}
               </text>
@@ -188,7 +197,7 @@ function LineTrendChart({
         {points.map((point) => (
           <div key={point.key} className="rounded-xl border border-border bg-muted/20 p-2 text-center">
             <p className="truncate text-xs font-medium">{point.label}</p>
-            <p className="mt-1 text-sm font-bold text-primary">
+            <p className="mt-1 text-sm font-bold text-sky-500">
               {point.value} {valueLabel}
             </p>
             {point.note && <p className="mt-1 truncate text-[11px] text-muted-foreground">{point.note}</p>}
@@ -213,7 +222,7 @@ export function AdminPage() {
   const [versions, setVersions] = useState<DocumentVersionItem[]>([]);
   const [versionLoading, setVersionLoading] = useState(false);
   const [userPage, setUserPage] = useState(1);
-  const [docPage, setDocPage] = useState(1); 
+  const [docPage, setDocPage] = useState(1);
   const [docSearch, setDocSearch] = useState('');
   const [docTypeFilter, setDocTypeFilter] = useState('');
   const [docMaxSize, setDocMaxSize] = useState(100);
@@ -299,10 +308,10 @@ export function AdminPage() {
   );
 
   const stats = [
-    { title: 'Tổng người dùng', value: String(users.length), change: `${verifiedUsers} đã xác thực`, icon: Users },
-    { title: 'Tổng tài liệu', value: String(documents.length), change: `${publicDocuments} công khai`, icon: FileText },
-    { title: 'Tổng lượt tải', value: String(totalDownloads), change: 'Từ API documents', icon: TrendingUp },
-    { title: 'Dung lượng đã dùng', value: formatFileSize(storageUsed), change: 'Toàn hệ thống', icon: HardDrive },
+    { title: 'Tổng người dùng', value: String(users.length), change: `${verifiedUsers} đã xác thực`, icon: Users, color: 'text-sky-500', iconBg: 'bg-sky-50 dark:bg-sky-500/10' },
+    { title: 'Tổng tài liệu', value: String(documents.length), change: `${publicDocuments} công khai`, icon: FileText, color: 'text-indigo-500', iconBg: 'bg-indigo-50 dark:bg-indigo-500/10' },
+    { title: 'Tổng lượt tải', value: String(totalDownloads), change: 'Từ API documents', icon: TrendingUp, color: 'text-emerald-500', iconBg: 'bg-emerald-50 dark:bg-emerald-500/10' },
+    { title: 'Dung lượng đã dùng', value: formatFileSize(storageUsed), change: 'Toàn hệ thống', icon: HardDrive, color: 'text-fuchsia-500', iconBg: 'bg-fuchsia-50 dark:bg-fuchsia-500/10' },
   ];
 
   const categoryStats = useMemo(() => {
@@ -378,8 +387,8 @@ export function AdminPage() {
   const recentDocuments = useMemo(() => documents.slice(0, 5), [documents]);
   const totalUserPages = Math.max(1, Math.ceil(users.length / USER_PAGE_SIZE));
   const paginatedUsers = useMemo(
-  () => users.slice((userPage - 1) * USER_PAGE_SIZE, userPage * USER_PAGE_SIZE),
-  [users, userPage],
+    () => users.slice((userPage - 1) * USER_PAGE_SIZE, userPage * USER_PAGE_SIZE),
+    [users, userPage],
   );
   const filteredDocuments = useMemo(() => {
     return documents.filter((doc) => {
@@ -537,7 +546,7 @@ export function AdminPage() {
     <div className="space-y-6 text-slate-900 dark:text-slate-100">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center shadow-md">
+          <div className="w-12 h-12 bg-gradient-to-br from-violet-500 via-indigo-500 to-fuchsia-500 rounded-xl flex items-center justify-center shadow-lg shadow-fuchsia-500/30">
             <PageIcon className="w-6 h-6 text-white" />
           </div>
           <div>
@@ -546,7 +555,7 @@ export function AdminPage() {
           </div>
         </div>
 
-        <Button onClick={loadAdminData} disabled={loading} variant="outline" className="gap-2">
+        <Button onClick={loadAdminData} disabled={loading} variant="outline" className="gap-2 hover:border-sky-400/50 hover:text-sky-500">
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           Tải lại
         </Button>
@@ -556,7 +565,7 @@ export function AdminPage() {
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {stats.map((stat, index) => (
-              <Card key={index} className="border-border/50 bg-white dark:bg-slate-900 shadow-sm">
+              <Card key={index} className={glowCard}>
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -564,8 +573,8 @@ export function AdminPage() {
                       <h3 className="text-2xl font-bold mt-1">{stat.value}</h3>
                       <p className="text-xs text-muted-foreground mt-1">{stat.change}</p>
                     </div>
-                    <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
-                      <stat.icon className="w-6 h-6 text-primary" />
+                    <div className={`w-12 h-12 ${stat.iconBg} rounded-xl flex items-center justify-center`}>
+                      <stat.icon className={`w-6 h-6 ${stat.color}`} />
                     </div>
                   </div>
                 </CardContent>
@@ -576,10 +585,12 @@ export function AdminPage() {
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             {/* Cột trái: 2 chart xếp dọc, chiếm 2/3 */}
             <div className="xl:col-span-2 flex flex-col gap-6">
-              <Card className="border-border/50 bg-white dark:bg-slate-900 shadow-sm">
+              <Card className={glowCard}>
                 <CardHeader>
                   <div className="flex items-center gap-2">
-                    <BarChart3 className="w-5 h-5 text-primary" />
+                    <span className="w-9 h-9 rounded-lg bg-sky-50 dark:bg-sky-500/10 flex items-center justify-center">
+                      <BarChart3 className="w-5 h-5 text-sky-500" />
+                    </span>
                     <CardTitle>Đường cao thấp tài liệu theo danh mục</CardTitle>
                   </div>
                   <CardDescription>
@@ -597,10 +608,12 @@ export function AdminPage() {
                 </CardContent>
               </Card>
 
-              <Card className="border-border/50 bg-white dark:bg-slate-900 shadow-sm">
+              <Card className={glowCard}>
                 <CardHeader>
                   <div className="flex items-center gap-2">
-                    <Activity className="w-5 h-5 text-primary" />
+                    <span className="w-9 h-9 rounded-lg bg-sky-50 dark:bg-sky-500/10 flex items-center justify-center">
+                      <Activity className="w-5 h-5 text-sky-500" />
+                    </span>
                     <CardTitle>Đường xu hướng tài liệu 7 ngày</CardTitle>
                   </div>
                   <CardDescription>Biểu đồ đường thẳng thể hiện ngày nào tải lên cao, ngày nào thấp.</CardDescription>
@@ -619,17 +632,19 @@ export function AdminPage() {
 
             {/* Cột phải: 3 card xếp dọc, chiếm 1/3 */}
             <div className="flex flex-col gap-6">
-              <Card className="border-border/50 bg-white dark:bg-slate-900 shadow-sm">
+              <Card className={glowCard}>
                 <CardHeader>
                   <div className="flex items-center gap-2">
-                    <CalendarDays className="w-5 h-5 text-primary" />
+                    <span className="w-9 h-9 rounded-lg bg-sky-50 dark:bg-sky-500/10 flex items-center justify-center">
+                      <CalendarDays className="w-5 h-5 text-sky-500" />
+                    </span>
                     <CardTitle>Tài liệu mới nhất</CardTitle>
                   </div>
                   <CardDescription>5 tài liệu vừa được tải lên hệ thống.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {recentDocuments.map((doc) => (
-                    <div key={doc.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/20 p-3">
+                    <div key={doc.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/20 p-3 hover:shadow-[0_0_20px_-10px_rgba(56,189,248,0.6)] transition-shadow">
                       <div className="min-w-0">
                         <p className="font-medium truncate">{doc.title}</p>
                         <p className="text-xs text-muted-foreground">
@@ -645,19 +660,21 @@ export function AdminPage() {
                 </CardContent>
               </Card>
 
-              <Card className="border-border/50 bg-white dark:bg-slate-900 shadow-sm">
+              <Card className={glowCard}>
                 <CardHeader>
                   <div className="flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-primary" />
+                    <span className="w-9 h-9 rounded-lg bg-sky-50 dark:bg-sky-500/10 flex items-center justify-center">
+                      <TrendingUp className="w-5 h-5 text-sky-500" />
+                    </span>
                     <CardTitle>Tài liệu tải nhiều</CardTitle>
                   </div>
                   <CardDescription>Top tài liệu có lượt tải cao nhất.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {topDocuments.map((doc, index) => (
-                    <div key={doc.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/20 p-3">
+                    <div key={doc.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/20 p-3 hover:shadow-[0_0_20px_-10px_rgba(56,189,248,0.6)] transition-shadow">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">
+                        <div className="w-8 h-8 rounded-lg bg-sky-50 dark:bg-sky-500/10 text-sky-500 flex items-center justify-center text-sm font-bold">
                           {index + 1}
                         </div>
                         <div className="min-w-0">
@@ -678,7 +695,7 @@ export function AdminPage() {
         </div>
       )}
       {pageMode === 'users' && (
-        <Card className="border-border/50 bg-white dark:bg-slate-900 shadow-sm">
+        <Card className={glowCard}>
           <CardHeader>
             <CardTitle>Quản lý người dùng</CardTitle>
             <CardDescription>Danh sách tài khoản.</CardDescription>
@@ -698,12 +715,12 @@ export function AdminPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                {paginatedUsers.map((user) => (
+                  {paginatedUsers.map((user) => (
                     <TableRow key={user.id}>
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <Avatar className="w-8 h-8">
-                            <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                          <Avatar className="w-8 h-8 ring-2 ring-indigo-500/20">
+                            <AvatarFallback className="bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white text-xs">
                               {getInitials(user.fullName, user.email)}
                             </AvatarFallback>
                           </Avatar>
@@ -716,6 +733,7 @@ export function AdminPage() {
                           value={user.role || 'USER'}
                           disabled={actionLoading === user.id}
                           onChange={(e) => handleChangeRole(user, e.target.value)}
+                          aria-label={`Vai trò của ${user.fullName || user.email}`}
                           className="h-9 rounded-md border border-input bg-background px-3 text-sm"
                         >
                           <option value="USER">USER</option>
@@ -754,7 +772,7 @@ export function AdminPage() {
                 </TableBody>
               </Table>
             </div>
-             {users.length > 0 && (
+            {users.length > 0 && (
               <div className="flex items-center justify-between mt-4 px-1">
                 <p className="text-sm text-muted-foreground">
                   {(userPage - 1) * USER_PAGE_SIZE + 1}–{Math.min(userPage * USER_PAGE_SIZE, users.length)}/{users.length} người dùng
@@ -789,14 +807,14 @@ export function AdminPage() {
                   >
                     <ChevronRight className="w-4 h-4" />
                   </Button>
-                      </div>
+                </div>
               </div>
             )}
           </CardContent>
         </Card>
       )}
       {pageMode === 'documents' && (
-        <Card className="border-border/50 bg-white dark:bg-slate-900 shadow-sm">
+        <Card className={glowCard}>
           <CardHeader>
             <CardTitle>Quản lý tài liệu</CardTitle>
             <CardDescription>Danh sách tài liệu.</CardDescription>
@@ -812,7 +830,8 @@ export function AdminPage() {
                     placeholder="Tìm theo tên..."
                     value={docSearch}
                     onChange={(e) => { setDocSearch(e.target.value); setDocPage(1); }}
-                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                    aria-label="Tìm theo tên tài liệu"
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-sky-400/40"
                   />
                 </div>
                 <div className="space-y-1">
@@ -820,6 +839,7 @@ export function AdminPage() {
                   <select
                     value={docTypeFilter}
                     onChange={(e) => { setDocTypeFilter(e.target.value); setDocPage(1); }}
+                    aria-label="Lọc theo loại tệp"
                     className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
                   >
                     <option value="">Tất cả loại</option>
@@ -832,7 +852,7 @@ export function AdminPage() {
               <div className="space-y-1">
                 <div className="flex justify-between text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   <span>Dung lượng tối đa</span>
-                  <span className="text-primary">≤ {docMaxSize} MB</span>
+                  <span className="text-sky-500">≤ {docMaxSize} MB</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-xs text-muted-foreground whitespace-nowrap">0 MB</span>
@@ -842,7 +862,8 @@ export function AdminPage() {
                     max={100}
                     value={docMaxSize}
                     onChange={(e) => { setDocMaxSize(Number(e.target.value)); setDocPage(1); }}
-                    className="w-full accent-primary"
+                    aria-label="Dung lượng tối đa (MB)"
+                    className="w-full accent-sky-500"
                   />
                   <span className="text-xs text-muted-foreground whitespace-nowrap">100 MB</span>
                 </div>
@@ -863,7 +884,7 @@ export function AdminPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                 {paginatedDocuments.map((doc) => (
+                  {paginatedDocuments.map((doc) => (
                     <TableRow key={doc.id}>
                       <TableCell className="font-medium max-w-[320px] truncate">{doc.title}</TableCell>
                       <TableCell className="text-muted-foreground">
@@ -878,7 +899,7 @@ export function AdminPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="text-primary hover:text-primary"
+                            className="text-sky-600 hover:text-sky-600 dark:text-sky-400"
                             onClick={() => navigate(`/documents/${doc.id}`)}
                           >
                             <FileText className="w-4 h-4 mr-1" />
@@ -918,7 +939,7 @@ export function AdminPage() {
                       </TableCell>
                     </TableRow>
                   ))}
-                 {!filteredDocuments.length && (
+                  {!filteredDocuments.length && (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                         {loading ? 'Đang tải tài liệu...' : 'Chưa có tài liệu.'}
@@ -928,7 +949,7 @@ export function AdminPage() {
                 </TableBody>
               </Table>
             </div>
-             {filteredDocuments.length > 0 && (
+            {filteredDocuments.length > 0 && (
               <div className="flex items-center justify-between mt-4 px-1">
                 <p className="text-sm text-muted-foreground">
                   {(docPage - 1) * DOC_PAGE_SIZE + 1}–{Math.min(docPage * DOC_PAGE_SIZE, filteredDocuments.length)}/{filteredDocuments.length} tài liệu
@@ -950,7 +971,7 @@ export function AdminPage() {
                   </Button>
                 </div>
               </div>
-              )}
+            )}
           </CardContent>
         </Card>
       )}
@@ -958,7 +979,7 @@ export function AdminPage() {
       {pageMode === 'aichat' && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="border-border/50 bg-white dark:bg-slate-900 shadow-sm">
+            <Card className={glowCard}>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -966,15 +987,15 @@ export function AdminPage() {
                     <h3 className="text-2xl font-bold mt-1">{chatCount}</h3>
                     <p className="text-xs text-muted-foreground mt-1">Theo dữ liệu API hiện tại</p>
                   </div>
-                  <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
-                    <MessageSquare className="w-6 h-6 text-primary" />
+                  <div className="w-12 h-12 bg-sky-50 dark:bg-sky-500/10 rounded-xl flex items-center justify-center">
+                    <MessageSquare className="w-6 h-6 text-sky-500" />
                   </div>
                 </div>
-                
+
               </CardContent>
             </Card>
 
-            <Card className="border-border/50 bg-white dark:bg-slate-900 shadow-sm">
+            <Card className={glowCard}>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -982,14 +1003,14 @@ export function AdminPage() {
                     <h3 className="text-2xl font-bold mt-1">{users.length}</h3>
                     <p className="text-xs text-muted-foreground mt-1">Có thể dùng AI Chat</p>
                   </div>
-                  <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
-                    <Users className="w-6 h-6 text-primary" />
+                  <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-500/10 rounded-xl flex items-center justify-center">
+                    <Users className="w-6 h-6 text-indigo-500" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="border-border/50 bg-white dark:bg-slate-900 shadow-sm">
+            <Card className={glowCard}>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -997,15 +1018,15 @@ export function AdminPage() {
                     <h3 className="text-2xl font-bold mt-1">API</h3>
                     <p className="text-xs text-muted-foreground mt-1">Lấy từ /api/ai/sessions</p>
                   </div>
-                  <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
-                    <Activity className="w-6 h-6 text-primary" />
+                  <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl flex items-center justify-center">
+                    <Activity className="w-6 h-6 text-emerald-500" />
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          <Card className="border-border/50 bg-white dark:bg-slate-900 shadow-sm">
+          <Card className={glowCard}>
             <CardHeader>
               <CardTitle>Ghi chú AI Chat Admin</CardTitle>
               <CardDescription>
