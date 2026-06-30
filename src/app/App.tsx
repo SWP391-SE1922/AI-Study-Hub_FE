@@ -16,6 +16,9 @@ import { ProfilePage } from './pages/ProfilePage';
 import { ChatPage } from './pages/ChatPage';
 import { AdminPage } from './pages/admin/AdminPage';
 import { CategoryPage } from './pages/admin/adminCategory';
+import {AdminDocumentDetailPage} from './pages/admin/AdminDocumentDetailPage';
+
+
 
 // Layouts
 import { MainLayout } from './components/layout/MainLayout';

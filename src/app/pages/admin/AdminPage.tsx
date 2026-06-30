@@ -233,13 +233,16 @@ export function AdminPage() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const pageMode = location.pathname.includes('/admin/users')
+const pageMode =
+  location.pathname.includes('/admin/users')
     ? 'users'
-    : location.pathname.includes('/admin/documents')
+    : location.pathname === '/admin/documents'
       ? 'documents'
-      : location.pathname.includes('/admin/aichat')
-        ? 'aichat'
-        : 'dashboard';
+      : location.pathname.startsWith('/admin/documents/')
+        ? 'document-detail'
+        : location.pathname.includes('/admin/aichat')
+          ? 'aichat'
+          : 'dashboard';
 
   const loadAdminData = async () => {
     setLoading(true);
@@ -289,6 +292,13 @@ export function AdminPage() {
     setCategories(nextCategories);
     setChatCount(nextChatCount);
     setCurrentUser(nextCurrentUser);
+    if (pageMode === "documents") {
+    setDocSearch("");
+    setDocTypeFilter("");
+    setFromDate("");
+    setToDate("");
+    setDocMaxSize(100);
+  }
     setUserPage(1);
     setDocPage(1);
     setLoading(false);
@@ -712,10 +722,6 @@ export function AdminPage() {
       )}
       {pageMode === 'users' && (
         <Card className={glowCard}>
-          <CardHeader>
-            <CardTitle>Quản lý người dùng</CardTitle>
-            <CardDescription>Danh sách tài khoản.</CardDescription>
-          </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
               <Table>
@@ -831,10 +837,6 @@ export function AdminPage() {
       )}
       {pageMode === 'documents' && (
         <Card className={glowCard}>
-          <CardHeader>
-            <CardTitle>Quản lý tài liệu</CardTitle>
-            <CardDescription>Danh sách tài liệu.</CardDescription>
-          </CardHeader>
           <CardContent>
             {/* Filter bar */}
             <div className="space-y-3 mb-4">
@@ -947,7 +949,7 @@ export function AdminPage() {
                             variant="ghost"
                             size="sm"
                             className="text-sky-600 hover:text-sky-600 dark:text-sky-400"
-                            onClick={() => navigate(`/documents/${doc.id}`)}
+                            onClick={() => navigate(`/admin/documents/${doc.id}`)}
                           >
                             <FileText className="w-4 h-4 mr-1" />
                             Xem
