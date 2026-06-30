@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, FileText, Calendar, HardDrive, Download, ExternalLink, Tags, User, Lock, Unlock } from 'lucide-react';
+import { ArrowLeft, FileText, Calendar, HardDrive, Download, ExternalLink, Tags, User, Lock, Unlock, History, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '../../components/ui/button';
-import { downloadDocument, getDocumentById, openDocumentPreview, type DocumentItem } from '../../services/api';
+import { downloadDocument, downloadFileFromUrl, getDocumentById, getDocumentVersions, openDocumentPreview, openFilePreview, type DocumentItem, type DocumentVersionItem } from '../../services/api';
 
 function formatDate(value?: string) {
   if (!value) return 'Không rõ ngày';
@@ -28,9 +28,16 @@ function getDocumentCategory(doc: DocumentItem) {
   return doc.category?.name || doc.subjectRef?.name || doc.subject || 'Chưa phân loại';
 }
 
+function getVersionCount(doc: DocumentItem | null, versions: DocumentVersionItem[]) {
+  const apiCount = (doc as (DocumentItem & { _count?: { versions?: number } }) | null)?._count?.versions || 0;
+  return Math.max(doc?.currentVersion || 0, versions.length || 0, apiCount, 1);
+}
+
 export function DocumentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [document, setDocument] = useState<DocumentItem | null>(null);
+  const [versions, setVersions] = useState<DocumentVersionItem[]>([]);
+  const [versionLoading, setVersionLoading] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -41,6 +48,17 @@ export function DocumentDetailPage() {
       try {
         const result = await getDocumentById(id);
         setDocument(result);
+        setVersions(result.versions || []);
+
+        setVersionLoading(true);
+        try {
+          const versionList = await getDocumentVersions(id);
+          setVersions(versionList.length ? versionList : (result.versions || []));
+        } catch {
+          setVersions(result.versions || []);
+        } finally {
+          setVersionLoading(false);
+        }
       } catch (error) {
         toast.error(error instanceof Error ? error.message : 'Không thể tải chi tiết tài liệu');
       } finally {
@@ -69,6 +87,45 @@ export function DocumentDetailPage() {
     }
   };
 
+  const getVersionFile = (version: DocumentVersionItem) => ({
+    fileUrl: version.fileUrl || (version.version === document?.currentVersion ? document?.fileUrl : ''),
+    fileName: version.fileName || document?.fileName || `version-${version.version}`,
+    mimeType: version.mimeType || document?.mimeType || '',
+  });
+
+  const handleViewVersion = (version: DocumentVersionItem) => {
+    try {
+      openFilePreview(getVersionFile(version));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Không thể xem version này');
+    }
+  };
+
+  const handleDownloadVersion = (version: DocumentVersionItem) => {
+    try {
+      const file = getVersionFile(version);
+      downloadFileFromUrl(file.fileUrl, file.fileName || `version-${version.version}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Không thể tải version này');
+    }
+  };
+
+  const displayVersions: DocumentVersionItem[] = versions.length > 0
+    ? versions
+    : document
+      ? [{
+          id: document.id,
+          version: document.currentVersion || 1,
+          fileName: document.fileName,
+          fileSize: document.fileSize,
+          mimeType: document.mimeType,
+          fileUrl: document.fileUrl,
+          createdAt: document.updatedAt || document.createdAt,
+        }]
+      : [];
+
+  const versionCount = getVersionCount(document, displayVersions);
+
   return (
     <div className="space-y-6">
       <Button asChild variant="ghost" className="rounded-xl pl-2">
@@ -93,6 +150,10 @@ export function DocumentDetailPage() {
                   <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-muted-foreground">
                     <span className="px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                       {getDocumentCategory(document)}
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/20 font-semibold">
+                      <History className="w-3.5 h-3.5" />
+                      {versionCount} version
                     </span>
                     <span>ID: {document.id}</span>
                   </div>
@@ -185,18 +246,59 @@ export function DocumentDetailPage() {
               </div>
             </div>
 
-            {document.versions && document.versions.length > 0 && (
-              <div className="rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 p-5">
-                <h2 className="font-semibold text-slate-900 dark:text-white mb-3">Lịch sử phiên bản</h2>
+            <div className="rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 p-5">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div>
+                  <h2 className="font-semibold text-slate-900 dark:text-white">Xem lại lịch sử phiên bản</h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Tài liệu này hiện có {versionCount} version.</p>
+                </div>
+                <span className="text-xs font-semibold text-indigo-500 bg-indigo-500/10 px-3 py-1 rounded-full">
+                  Version hiện tại: {document.currentVersion || versions[0]?.version || 1}
+                </span>
+              </div>
+
+              {versionLoading ? (
+                <p className="text-sm text-slate-500 dark:text-slate-400">Đang tải lịch sử version...</p>
+              ) : displayVersions.length > 0 ? (
                 <div className="space-y-2">
-                  {document.versions.map((version) => (
-                    <div key={version.id} className="text-sm text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 rounded-lg p-3">
-                      Version {version.version} • {version.fileName} • {formatFileSize(version.fileSize)} • {formatDate(version.createdAt)}
+                  {displayVersions.map((version) => (
+                    <div key={version.id || version.version} className="text-sm text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 rounded-xl p-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-bold text-slate-900 dark:text-white">Version {version.version}</p>
+                          <p className="break-all">{version.fileName}</p>
+                          <p className="text-xs mt-1">{formatFileSize(version.fileSize)} • {formatDate(version.createdAt)}</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2 self-start sm:self-auto">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="rounded-xl gap-2"
+                            onClick={() => handleViewVersion(version)}
+                          >
+                            <Eye className="w-4 h-4" />
+                            Xem
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="rounded-xl gap-2"
+                            onClick={() => handleDownloadVersion(version)}
+                          >
+                            <Download className="w-4 h-4" />
+                            Tải
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+              ) : (
+                <p className="text-sm text-slate-500 dark:text-slate-400">Chưa có lịch sử version cho tài liệu này.</p>
+              )}
+            </div>
           </>
         ) : (
           <p className="text-sm text-slate-400">Không tìm thấy tài liệu.</p>

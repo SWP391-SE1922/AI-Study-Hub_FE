@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { FileText, X } from 'lucide-react';
 import { Button } from '../ui/button';
 import type { CategoryItem, DocumentMetadata } from '../../services/api';
@@ -11,8 +11,9 @@ type Props = {
   categories: CategoryItem[];
   submitting?: boolean;
   initialValues?: Partial<DocumentMetadata>;
+  allowFileChange?: boolean;
   onClose: () => void;
-  onSubmit: (metadata: DocumentMetadata) => void;
+  onSubmit: (metadata: DocumentMetadata, file?: File | null) => void;
 };
 
 export function DocumentMetadataDialog({
@@ -23,6 +24,7 @@ export function DocumentMetadataDialog({
   categories,
   submitting = false,
   initialValues,
+  allowFileChange = false,
   onClose,
   onSubmit,
 }: Props) {
@@ -33,6 +35,7 @@ export function DocumentMetadataDialog({
     categoryId: '',
     isPublic: true,
   });
+  const [replacementFile, setReplacementFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -43,6 +46,7 @@ export function DocumentMetadataDialog({
       categoryId: initialValues?.categoryId || '',
       isPublic: initialValues?.isPublic ?? true,
     });
+    setReplacementFile(null);
   }, [open, fileName, initialValues?.title, initialValues?.description, initialValues?.subject, initialValues?.categoryId, initialValues?.isPublic]);
 
   if (!open) return null;
@@ -56,7 +60,11 @@ export function DocumentMetadataDialog({
       subject: form.subject?.trim() || '',
       categoryId: form.categoryId || '',
       isPublic: form.isPublic ?? true,
-    });
+    }, replacementFile);
+  };
+
+  const handleReplacementFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setReplacementFile(event.target.files?.[0] || null);
   };
 
   return (
@@ -126,6 +134,23 @@ export function DocumentMetadataDialog({
               placeholder="Nhập mô tả ngắn để khi xem chi tiết biết tài liệu dùng cho nội dung nào..."
             />
           </div>
+
+          {allowFileChange && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">File mới để tạo version</label>
+              <input
+                type="file"
+                onChange={handleReplacementFileChange}
+                className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <p className="text-xs text-muted-foreground">
+                Không chọn file thì chỉ sửa thông tin. Chọn file mới thì backend sẽ tạo version mới nếu API hỗ trợ.
+              </p>
+              {replacementFile && (
+                <p className="text-xs font-semibold text-indigo-500 break-all">Đã chọn: {replacementFile.name}</p>
+              )}
+            </div>
+          )}
 
           <label className="flex items-center gap-2 text-sm text-muted-foreground select-none">
             <input

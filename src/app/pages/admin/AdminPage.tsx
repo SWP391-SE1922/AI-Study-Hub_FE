@@ -11,8 +11,10 @@ import {
   FileText,
   FolderOpen,
   HardDrive,
+  History,
   MessageSquare,
   RefreshCw,
+  Pencil,
   Shield,
   Trash2,
   TrendingUp,
@@ -25,15 +27,24 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Avatar, AvatarFallback } from '../../components/ui/avatar';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../components/ui/dialog';
+import { DocumentMetadataDialog } from '../../components/documents/DocumentMetadataDialog';
 import {
   deleteDocument,
   deleteUser,
+  getCategories,
   getChatSessions,
   getDocuments,
+  getDocumentVersions,
   getMe,
   getUsers,
+  toAbsoluteFileUrl,
+  updateDocument,
   updateUserRole,
+  type CategoryItem,
   type DocumentItem,
+  type DocumentMetadata,
+  type DocumentVersionItem,
   type User,
 } from '../../services/api';
 
@@ -191,10 +202,16 @@ function LineTrendChart({
 export function AdminPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [chatCount, setChatCount] = useState(0);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [editingDocument, setEditingDocument] = useState<DocumentItem | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
+  const [versionDocument, setVersionDocument] = useState<DocumentItem | null>(null);
+  const [versions, setVersions] = useState<DocumentVersionItem[]>([]);
+  const [versionLoading, setVersionLoading] = useState(false);
   const [userPage, setUserPage] = useState(1);
   const [docPage, setDocPage] = useState(1); 
   const [docSearch, setDocSearch] = useState('');
@@ -220,6 +237,7 @@ export function AdminPage() {
     const nextUsers: User[] = [];
     let nextDocuments: DocumentItem[] = [];
     let nextChatCount = 0;
+    let nextCategories: CategoryItem[] = [];
     let nextCurrentUser: User | null = null;
 
     try {
@@ -237,6 +255,12 @@ export function AdminPage() {
     }
 
     try {
+      nextCategories = await getCategories();
+    } catch {
+      nextCategories = [];
+    }
+
+    try {
       const chatSessions = await getChatSessions();
       nextChatCount = chatSessions.length || 0;
     } catch {
@@ -251,6 +275,7 @@ export function AdminPage() {
 
     setUsers(nextUsers);
     setDocuments(nextDocuments);
+    setCategories(nextCategories);
     setChatCount(nextChatCount);
     setCurrentUser(nextCurrentUser);
     setUserPage(1);
@@ -416,6 +441,38 @@ export function AdminPage() {
       toast.error(error instanceof Error ? error.message : 'Không thể xóa tài liệu');
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleEditDocument = async (metadata: DocumentMetadata, file?: File | null) => {
+    if (!editingDocument?.id) return;
+
+    setEditLoading(true);
+    try {
+      const updatedDocument = await updateDocument(editingDocument.id, metadata, file);
+      setDocuments((prev) => prev.map((doc) => (doc.id === editingDocument.id ? { ...doc, ...updatedDocument } : doc)));
+      toast.success('Đã sửa tài liệu');
+      setEditingDocument(null);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Không thể sửa tài liệu');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const handleViewDocumentVersions = async (documentItem: DocumentItem) => {
+    setVersionDocument(documentItem);
+    setVersions(documentItem.versions || []);
+    setVersionLoading(true);
+
+    try {
+      const versionList = await getDocumentVersions(documentItem.id);
+      setVersions(versionList.length ? versionList : (documentItem.versions || []));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Không thể tải lịch sử version');
+      setVersions(documentItem.versions || []);
+    } finally {
+      setVersionLoading(false);
     }
   };
 
@@ -822,10 +879,30 @@ export function AdminPage() {
                             variant="ghost"
                             size="sm"
                             className="text-primary hover:text-primary"
-                           onClick={() => navigate(`/admin/documents/${doc.id}`)}
+                            onClick={() => navigate(`/documents/${doc.id}`)}
                           >
                             <FileText className="w-4 h-4 mr-1" />
                             Xem
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-amber-600 hover:text-amber-600"
+                            disabled={editLoading && editingDocument?.id === doc.id}
+                            onClick={() => setEditingDocument(doc)}
+                          >
+                            <Pencil className="w-4 h-4 mr-1" />
+                            Sửa
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-purple-600 hover:text-purple-600"
+                            disabled={versionLoading && versionDocument?.id === doc.id}
+                            onClick={() => handleViewDocumentVersions(doc)}
+                          >
+                            <History className="w-4 h-4 mr-1" />
+                            Version
                           </Button>
                           <Button
                             variant="ghost"
@@ -944,6 +1021,83 @@ export function AdminPage() {
           </Card>
         </div>
       )}
+
+      <DocumentMetadataDialog
+        open={Boolean(editingDocument)}
+        title="Sửa tài liệu"
+        submitLabel="Lưu thay đổi"
+        fileName={editingDocument?.fileName || editingDocument?.title}
+        categories={categories}
+        submitting={editLoading}
+        allowFileChange
+        initialValues={editingDocument ? {
+          title: editingDocument.title,
+          description: editingDocument.description || '',
+          subject: editingDocument.subjectRef?.name || editingDocument.subject || '',
+          categoryId: editingDocument.categoryId || editingDocument.category?.id || '',
+          isPublic: editingDocument.isPublic ?? true,
+        } : undefined}
+        onClose={() => {
+          if (!editLoading) setEditingDocument(null);
+        }}
+        onSubmit={handleEditDocument}
+      />
+
+      <Dialog open={Boolean(versionDocument)} onOpenChange={(open) => {
+        if (!open) {
+          setVersionDocument(null);
+          setVersions([]);
+        }
+      }}>
+        <DialogContent className="sm:max-w-[620px] rounded-3xl p-6 border-border bg-background">
+          <DialogHeader className="mb-4">
+            <DialogTitle className="text-xl font-bold text-foreground">Lịch sử version</DialogTitle>
+            <DialogDescription>{versionDocument?.title || 'Tài liệu'}</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+            {versionLoading ? (
+              <div className="py-10 text-center text-sm text-muted-foreground">Đang tải version...</div>
+            ) : versions.length > 0 ? (
+              versions.map((version) => (
+                <div key={version.id || version.version} className="rounded-2xl border border-border bg-card p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div>
+                      <p className="font-bold text-foreground">Version {version.version}</p>
+                      <p className="text-sm text-muted-foreground break-all">{version.fileName}</p>
+                    </div>
+                    <span className="text-xs font-semibold text-indigo-500 bg-indigo-500/10 px-3 py-1 rounded-full self-start sm:self-auto">
+                      {formatFileSize(version.fileSize)}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">Ngày tạo: {formatDate(version.createdAt)}</p>
+                  {version.fileUrl && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-3 rounded-xl"
+                      onClick={() => window.open(toAbsoluteFileUrl(version.fileUrl), '_blank', 'noopener,noreferrer')}
+                    >
+                      Mở file version này
+                    </Button>
+                  )}
+                </div>
+              ))
+            ) : (
+              <div className="rounded-2xl border border-dashed border-border bg-muted/20 py-10 text-center text-sm text-muted-foreground">
+                Chưa có lịch sử version cho tài liệu này.
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="pt-4">
+            <Button type="button" variant="outline" onClick={() => setVersionDocument(null)} className="rounded-xl">
+              Đóng
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

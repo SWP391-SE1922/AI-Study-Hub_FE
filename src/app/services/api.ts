@@ -40,6 +40,16 @@ export type CategoryItem = {
   _count?: { documents: number };
 };
 
+export type DocumentVersionItem = {
+  id: string;
+  version: number;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  fileUrl?: string | null;
+  createdAt: string;
+};
+
 export type DocumentItem = {
   id: string;
   title: string;
@@ -62,14 +72,7 @@ export type DocumentItem = {
   category?: { id: string; name: string } | null;
   subjectRef?: { id: string; name: string; code?: string | null } | null;
   user?: { id: string; fullName?: string; avatarUrl?: string | null } | null;
-  versions?: Array<{
-    id: string;
-    version: number;
-    fileName: string;
-    fileSize: number;
-    mimeType: string;
-    createdAt: string;
-  }>;
+  versions?: DocumentVersionItem[];
 };
 
 export type DocumentMetadata = {
@@ -254,12 +257,38 @@ export async function uploadDocument(file: File, metadata: DocumentMetadata | st
   return result.data.document;
 }
 
-export async function updateDocument(id: string, metadata: Partial<DocumentMetadata>) {
+export async function updateDocument(id: string, metadata: Partial<DocumentMetadata>, file?: File | null) {
+  const body = file ? new FormData() : JSON.stringify(metadata);
+
+  if (file && body instanceof FormData) {
+    body.append('file', file);
+    body.append('title', metadata.title || '');
+    body.append('description', metadata.description || '');
+    body.append('subject', metadata.subject || '');
+    body.append('isPublic', String(metadata.isPublic ?? true));
+
+    if (metadata.categoryId) {
+      body.append('categoryId', metadata.categoryId);
+    }
+  }
+
   const result = await request<ApiResponse<{ document: DocumentItem }>>(`/documents/${id}`, {
     method: 'PUT',
-    body: JSON.stringify(metadata),
+    body,
   });
   return result.data.document;
+}
+
+export async function getDocumentVersions(id: string) {
+  const result = await request<ApiResponse<{ versions: DocumentVersionItem[] } | DocumentVersionItem[]> | { versions: DocumentVersionItem[] } | DocumentVersionItem[]>(`/documents/${id}/versions`);
+  const payload = result as any;
+
+  if (Array.isArray(payload)) return payload as DocumentVersionItem[];
+  if (Array.isArray(payload?.data)) return payload.data as DocumentVersionItem[];
+  if (Array.isArray(payload?.data?.versions)) return payload.data.versions as DocumentVersionItem[];
+  if (Array.isArray(payload?.versions)) return payload.versions as DocumentVersionItem[];
+
+  return [];
 }
 
 export async function deleteDocument(id: string) {
@@ -280,31 +309,72 @@ export function toAbsoluteFileUrl(fileUrl?: string | null) {
   return `${BACKEND_BASE_URL}${fileUrl.startsWith('/') ? '' : '/'}${fileUrl}`;
 }
 
-export function getDocumentPreviewUrl(document: DocumentItem) {
-  const absoluteUrl = toAbsoluteFileUrl(document.fileUrl);
+type FilePreviewSource = {
+  fileUrl?: string | null;
+  fileName?: string | null;
+  mimeType?: string | null;
+};
+
+export function getFilePreviewUrl(file: FilePreviewSource) {
+  const absoluteUrl = toAbsoluteFileUrl(file.fileUrl);
   if (!absoluteUrl) return '';
 
-  const mimeType = document.mimeType || '';
-  const fileName = document.fileName || '';
+  const mimeType = file.mimeType || '';
+  const fileName = file.fileName || '';
   const isOfficeFile = /\.(doc|docx|ppt|pptx|xls|xlsx)$/i.test(fileName)
     || mimeType.includes('officedocument')
     || mimeType.includes('msword')
     || mimeType.includes('ms-powerpoint')
     || mimeType.includes('ms-excel');
 
-  if (isOfficeFile && /^https?:\/\//i.test(absoluteUrl) && !absoluteUrl.includes('localhost')) {
+  // Trình duyệt thường sẽ tải thẳng file Word/PowerPoint/Excel.
+  // Với file public trên Cloudinary/internet, dùng Google Viewer để nút "Xem" là xem trước thật.
+  if (isOfficeFile && /^https?:\/\//i.test(absoluteUrl) && !absoluteUrl.includes('localhost') && !absoluteUrl.includes('127.0.0.1')) {
     return `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(absoluteUrl)}`;
   }
 
   return absoluteUrl;
 }
 
-export function openDocumentPreview(document: DocumentItem) {
-  const previewUrl = getDocumentPreviewUrl(document);
+export function getDocumentPreviewUrl(document: DocumentItem) {
+  return getFilePreviewUrl(document);
+}
+
+export function openFilePreview(file: FilePreviewSource) {
+  const previewUrl = getFilePreviewUrl(file);
   if (!previewUrl) {
-    throw new Error('Tài liệu chưa có đường dẫn để mở.');
+    throw new Error('File này chưa có đường dẫn để mở.');
   }
   window.open(previewUrl, '_blank', 'noopener,noreferrer');
+}
+
+export function openDocumentPreview(document: DocumentItem) {
+  openFilePreview(document);
+}
+
+function getDownloadUrl(fileUrl: string) {
+  // Với Cloudinary, thêm fl_attachment để ưu tiên tải file thay vì mở preview.
+  if (fileUrl.includes('res.cloudinary.com') && fileUrl.includes('/upload/') && !fileUrl.includes('/fl_attachment/')) {
+    return fileUrl.replace('/upload/', '/upload/fl_attachment/');
+  }
+
+  return fileUrl;
+}
+
+export function downloadFileFromUrl(fileUrl?: string | null, fallbackFileName = 'file') {
+  const absoluteUrl = toAbsoluteFileUrl(fileUrl);
+  if (!absoluteUrl) {
+    throw new Error('File này chưa có đường dẫn để tải.');
+  }
+
+  const anchor = document.createElement('a');
+  anchor.href = getDownloadUrl(absoluteUrl);
+  anchor.download = fallbackFileName;
+  anchor.target = '_blank';
+  anchor.rel = 'noopener noreferrer';
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
 }
 
 export async function downloadDocument(id: string, fallbackFileName: string) {

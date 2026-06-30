@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertCircle, Download, Eye, FileText, Search, Trash2, Upload } from 'lucide-react';
+import { AlertCircle, Download, Eye, FileText, History, Pencil, Search, Trash2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '../../components/ui/button';
 import {
@@ -15,6 +15,7 @@ import {
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
+import { DocumentMetadataDialog } from '../../components/documents/DocumentMetadataDialog';
 import {
   deleteDocument,
   downloadDocument,
@@ -22,8 +23,10 @@ import {
   getDocuments,
   getToken,
   toAbsoluteFileUrl,
+  updateDocument,
   type CategoryItem,
   type DocumentItem,
+  type DocumentMetadata,
 } from '../../services/api';
 
 type SubjectItem = {
@@ -40,10 +43,11 @@ type DocumentWithImage = DocumentItem & {
 type ApiEnvelope<T> = {
   success?: boolean;
   message?: string;
-  data?: T | { subjects?: T; categories?: T; documents?: T };
+  data?: T | { subjects?: T; categories?: T; documents?: T; versions?: T };
   subjects?: T;
   categories?: T;
   documents?: T;
+  versions?: T;
 };
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3636/api').replace(/\/$/, '');
@@ -57,7 +61,7 @@ function formatBytes(bytes?: number, decimals = 2) {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
 }
 
-function extractArray<T>(payload: ApiEnvelope<T[]> | T[] | unknown, key: 'subjects' | 'categories' | 'documents'): T[] {
+function extractArray<T>(payload: ApiEnvelope<T[]> | T[] | unknown, key: 'subjects' | 'categories' | 'documents' | 'versions'): T[] {
   if (Array.isArray(payload)) return payload;
 
   const envelope = payload as ApiEnvelope<T[]> | undefined;
@@ -95,6 +99,11 @@ function getImageUrl(doc: DocumentWithImage) {
   return doc.imgUrl ? toAbsoluteFileUrl(doc.imgUrl) : '';
 }
 
+function getVersionCount(doc: DocumentWithImage) {
+  const apiCount = (doc as { _count?: { versions?: number } })._count?.versions || 0;
+  return Math.max(doc.currentVersion || 0, doc.versions?.length || 0, apiCount, 1);
+}
+
 export function DocumentsPage() {
   const [documents, setDocuments] = useState<DocumentWithImage[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
@@ -117,6 +126,10 @@ export function DocumentsPage() {
   const [categoryId, setCategoryId] = useState('');
   const [subject, setSubject] = useState(''); // Chuỗi text nhập từ form upload công khai
   const [isPublic, setIsPublic] = useState(true);
+
+  // States khôi phục nút sửa tài liệu và xem version
+  const [editingDocument, setEditingDocument] = useState<DocumentWithImage | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
 
   // Cơ chế Debounce hoãn gọi API khi người dùng đang gõ tìm kiếm chữ cái
   useEffect(() => {
@@ -291,6 +304,25 @@ export function DocumentsPage() {
     }
   };
 
+  const handleEditSubmit = async (metadata: DocumentMetadata, file?: File | null) => {
+    if (!editingDocument) return;
+
+    setEditLoading(true);
+    try {
+      const updatedDocument = await updateDocument(editingDocument.id, metadata, file);
+      setDocuments((prev) =>
+        prev.map((doc) => (doc.id === editingDocument.id ? { ...doc, ...updatedDocument } : doc)),
+      );
+      toast.success('Đã sửa thông tin tài liệu!');
+      setEditingDocument(null);
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : 'Lỗi khi sửa tài liệu.');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
   const handleUploadOpenChange = (open: boolean) => {
     setIsUploadOpen(open);
     if (!open && !uploadLoading) resetUploadForm();
@@ -381,6 +413,7 @@ export function DocumentsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {documents.map((doc) => {
             const imageUrl = getImageUrl(doc);
+            const versionCount = getVersionCount(doc);
 
             return (
               <div key={doc.id} className="bg-card border border-border rounded-2xl p-5 hover:border-indigo-500/40 transition-all shadow-sm flex flex-col justify-between group">
@@ -422,10 +455,14 @@ export function DocumentsPage() {
                       <span>•</span>
                       <span>{new Date(doc.createdAt).toLocaleDateString('vi-VN')}</span>
                     </div>
+                    <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-purple-500/20 bg-purple-500/10 px-2.5 py-1 text-[11px] font-bold text-purple-600 dark:text-purple-300">
+                      <History className="w-3.5 h-3.5" />
+                      <span>{versionCount} version</span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-1 border-t border-border pt-4 mt-5 text-muted-foreground text-xs font-semibold">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 border-t border-border pt-4 mt-5 text-muted-foreground text-xs font-semibold">
                   <button
                     type="button"
                     onClick={() => handleDownload(doc)}
@@ -442,6 +479,15 @@ export function DocumentsPage() {
                     <Eye className="w-4 h-4" />
                     <span>Chi tiết</span>
                   </Link>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditingDocument(doc)}
+                    className="flex flex-col items-center gap-1 py-1 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+                  >
+                    <Pencil className="w-4 h-4" />
+                    <span>Sửa</span>
+                  </button>
 
                   <button
                     type="button"
@@ -569,6 +615,28 @@ export function DocumentsPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <DocumentMetadataDialog
+        open={Boolean(editingDocument)}
+        title="Sửa tài liệu"
+        submitLabel="Lưu thay đổi"
+        fileName={editingDocument?.fileName || editingDocument?.title}
+        categories={categories}
+        submitting={editLoading}
+        allowFileChange
+        initialValues={editingDocument ? {
+          title: editingDocument.title,
+          description: editingDocument.description || '',
+          subject: editingDocument.subjectRef?.name || editingDocument.subject || '',
+          categoryId: editingDocument.categoryId || editingDocument.category?.id || '',
+          isPublic: editingDocument.isPublic ?? true,
+        } : undefined}
+        onClose={() => {
+          if (!editLoading) setEditingDocument(null);
+        }}
+        onSubmit={handleEditSubmit}
+      />
+
     </div>
   );
 }
