@@ -16,7 +16,8 @@ import { ProfilePage } from './pages/ProfilePage';
 import { ChatPage } from './pages/ChatPage';
 import { AdminPage } from './pages/admin/AdminPage';
 import { CategoryPage } from './pages/admin/adminCategory';
-import {AdminDocumentDetailPage} from './pages/admin/AdminDocumentDetailPage';
+import { SubjectPage } from './pages/admin/SubjectPage'; 
+import { AdminDocumentDetailPage } from './pages/admin/AdminDocumentDetailPage';
 
 
 
@@ -108,8 +109,10 @@ export default function App() {
               <Route path="/admin" element={<AdminPage />} />
               <Route path="/admin/users" element={<AdminPage />} />
               <Route path="/admin/documents" element={<AdminPage />} />
+              <Route path="/admin/documents/:id" element={<AdminDocumentDetailPage />} />
               <Route path="/admin/aichat" element={<AdminPage />} />
               <Route path="/admin/category" element={<CategoryPage />} />
+              <Route path="/admin/subjects" element={<SubjectPage />} />  
             </Route>
           </Route>
 

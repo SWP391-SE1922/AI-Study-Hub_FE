@@ -29,6 +29,7 @@ import { Button } from '../../components/ui/button';
 import { Avatar, AvatarFallback } from '../../components/ui/avatar';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { DocumentMetadataDialog } from '../../components/documents/DocumentMetadataDialog';
+import { SubjectPage } from './SubjectPage'; 
 import {
   deleteDocument,
   deleteUser,
@@ -221,6 +222,11 @@ export function AdminPage() {
   const [versionDocument, setVersionDocument] = useState<DocumentItem | null>(null);
   const [versions, setVersions] = useState<DocumentVersionItem[]>([]);
   const [versionLoading, setVersionLoading] = useState(false);
+  const [userSearch, setUserSearch] = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState('');
+  const [userVerifiedFilter, setUserVerifiedFilter] = useState('');
+  const [userFromDate, setUserFromDate] = useState('');
+  const [userToDate, setUserToDate] = useState('');
   const [userPage, setUserPage] = useState(1);
   const [docPage, setDocPage] = useState(1);
   const [docSearch, setDocSearch] = useState('');
@@ -233,16 +239,15 @@ export function AdminPage() {
   const location = useLocation();
   const navigate = useNavigate();
 
-const pageMode =
-  location.pathname.includes('/admin/users')
-    ? 'users'
-    : location.pathname === '/admin/documents'
-      ? 'documents'
-      : location.pathname.startsWith('/admin/documents/')
-        ? 'document-detail'
-        : location.pathname.includes('/admin/aichat')
-          ? 'aichat'
-          : 'dashboard';
+const pageMode = location.pathname.includes('/admin/users')
+  ? 'users'
+  : location.pathname.includes('/admin/documents')
+    ? 'documents'
+    : location.pathname.includes('/admin/aichat')
+      ? 'aichat'
+      : location.pathname.includes('/admin/subjects')   
+        ? 'subjects'                                     
+        : 'dashboard';
 
   const loadAdminData = async () => {
     setLoading(true);
@@ -397,10 +402,27 @@ const pageMode =
   );
 
   const recentDocuments = useMemo(() => documents.slice(0, 5), [documents]);
-  const totalUserPages = Math.max(1, Math.ceil(users.length / USER_PAGE_SIZE));
+  const filteredUsers = useMemo(() => {
+    return users.filter((user) => {
+      const name = (user.fullName || '').toLowerCase();
+      const email = (user.email || '').toLowerCase();
+      const search = userSearch.trim().toLowerCase();
+      const matchSearch = !search || name.includes(search) || email.includes(search);
+      const matchRole = !userRoleFilter || (user.role || 'USER') === userRoleFilter;
+      const matchVerified =
+        !userVerifiedFilter ||
+        (userVerifiedFilter === 'verified' ? Boolean(user.isVerified) : !user.isVerified);
+      const dateKey = getDateKey(user.createdAt);
+      const matchFrom = !userFromDate || (dateKey && dateKey >= userFromDate);
+      const matchTo = !userToDate || (dateKey && dateKey <= userToDate);
+
+      return matchSearch && matchRole && matchVerified && matchFrom && matchTo;
+    });
+  }, [users, userSearch, userRoleFilter, userVerifiedFilter, userFromDate, userToDate]);
+  const totalUserPages = Math.max(1, Math.ceil(filteredUsers.length / USER_PAGE_SIZE));
   const paginatedUsers = useMemo(
-    () => users.slice((userPage - 1) * USER_PAGE_SIZE, userPage * USER_PAGE_SIZE),
-    [users, userPage],
+    () => filteredUsers.slice((userPage - 1) * USER_PAGE_SIZE, userPage * USER_PAGE_SIZE),
+    [filteredUsers, userPage],
   );
   const filteredDocuments = useMemo(() => {
     return documents.filter((doc) => {
@@ -723,6 +745,92 @@ const pageMode =
       {pageMode === 'users' && (
         <Card className={glowCard}>
           <CardContent>
+            {/* Filter bar */}
+  <div className="space-y-3 mb-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+      <div className="space-y-1 xl:col-span-1">
+        <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tìm kiếm</label>
+        <input
+          type="text"
+          placeholder="Tìm theo tên hoặc email..."
+          value={userSearch}
+          onChange={(e) => { setUserSearch(e.target.value); setUserPage(1); }}
+          aria-label="Tìm kiếm theo tên hoặc email"
+          className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-sky-400/40"
+        />
+      </div>
+      <div className="space-y-1">
+        <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vai trò</label>
+        <select
+          value={userRoleFilter}
+          onChange={(e) => { setUserRoleFilter(e.target.value); setUserPage(1); }}
+          aria-label="Lọc theo vai trò"
+          className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+        >
+          <option value="">Tất cả vai trò</option>
+          <option value="USER">USER</option>
+          <option value="ADMIN">ADMIN</option>
+          <option value="GUEST">GUEST</option>
+        </select>
+      </div>
+      <div className="space-y-1">
+        <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trạng thái xác thực</label>
+        <select
+          value={userVerifiedFilter}
+          onChange={(e) => { setUserVerifiedFilter(e.target.value); setUserPage(1); }}
+          aria-label="Lọc theo trạng thái xác thực"
+          className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+        >
+          <option value="">Tất cả trạng thái</option>
+          <option value="verified">Đã xác thực</option>
+          <option value="unverified">Chưa xác thực</option>
+        </select>
+      </div>
+      <div className="space-y-1">
+        <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Từ ngày</label>
+        <input
+          type="date"
+          value={userFromDate}
+          onChange={(e) => { setUserFromDate(e.target.value); setUserPage(1); }}
+          aria-label="Lọc từ ngày tạo"
+          className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+        />
+      </div>
+      <div className="space-y-1">
+        <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Đến ngày</label>
+        <input
+          type="date"
+          value={userToDate}
+          onChange={(e) => { setUserToDate(e.target.value); setUserPage(1); }}
+          aria-label="Lọc đến ngày tạo"
+          className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+        />
+      </div>
+    </div>
+    {(userSearch || userRoleFilter || userVerifiedFilter || userFromDate || userToDate) && (
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">
+          Tìm thấy {filteredUsers.length} người dùng phù hợp.
+        </p>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs text-sky-600 hover:text-sky-600"
+          onClick={() => {
+            setUserSearch('');
+            setUserRoleFilter('');
+            setUserVerifiedFilter('');
+            setUserFromDate('');
+            setUserToDate('');
+            setUserPage(1);
+          }}
+        >
+          Xóa bộ lọc
+        </Button>
+      </div>
+    )}
+  </div>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -1091,7 +1199,6 @@ const pageMode =
           </Card>
         </div>
       )}
-
       <DocumentMetadataDialog
         open={Boolean(editingDocument)}
         title="Sửa tài liệu"
