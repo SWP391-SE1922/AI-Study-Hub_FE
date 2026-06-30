@@ -1,0 +1,26 @@
+# dependencies
+node_modules/
+.pnpm/
+
+
+# build
+dist/
+
+# vite cache
+.vite/
+
+# environment
+.env
+.env.local
+.env.development
+.env.production
+
+# logs
+*.log
+
+# IDE
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
