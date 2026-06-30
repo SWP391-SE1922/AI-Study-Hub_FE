@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2, BookOpen, AlertCircle, Calendar } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, BookOpen, AlertCircle, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Card, CardContent } from '@/app/components/ui/card';
@@ -31,7 +31,8 @@ export function SubjectPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
   // Dialog states
   const [isOpen, setIsOpen] = useState(false);
   const [dialogLoading, setDialogLoading] = useState(false);
@@ -131,7 +132,8 @@ export function SubjectPage() {
       (s.code && s.code.toLowerCase().includes(search.toLowerCase())) ||
       (s.description && s.description.toLowerCase().includes(search.toLowerCase()))
   );
-
+  const totalPages = Math.max(1, Math.ceil(filteredSubjects.length / PAGE_SIZE));
+  const paginatedSubjects = filteredSubjects.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   return (
     <div className="space-y-8 text-slate-900 dark:text-slate-100">
       {/* Title bar */}
@@ -155,7 +157,7 @@ export function SubjectPage() {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
             <Input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               placeholder="Tìm kiếm theo tên hoặc mã môn học..."
               className="pl-10 rounded-xl"
             />
@@ -196,7 +198,7 @@ export function SubjectPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredSubjects.map((subject) => (
+                  paginatedSubjects.map((subject) => (
                     <TableRow key={subject.id} className="hover:bg-muted/10 border-b border-border last:border-0 transition-colors">
                       <TableCell className="py-4 px-6 font-semibold text-slate-900 dark:text-slate-100 text-sm">
                         {subject.name}
@@ -243,7 +245,39 @@ export function SubjectPage() {
           </CardContent>
         </Card>
       )}
-
+      {filteredSubjects.length > 0 && (
+        <div className="flex items-center justify-between px-1">
+          <p className="text-sm text-muted-foreground">
+            {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filteredSubjects.length)}/{filteredSubjects.length} môn học
+          </p>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline" size="sm" className="h-8 w-8 p-0"
+              disabled={page === 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+              <Button
+                key={p}
+                variant={p === page ? 'default' : 'outline'}
+                size="sm" className="h-8 w-8 p-0 text-xs"
+                onClick={() => setPage(p)}
+              >
+                {p}
+              </Button>
+            ))}
+            <Button
+              variant="outline" size="sm" className="h-8 w-8 p-0"
+              disabled={page === totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      )}
       {/* Add / Edit Dialog */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="sm:max-w-[450px] rounded-3xl p-6 border-border bg-background">

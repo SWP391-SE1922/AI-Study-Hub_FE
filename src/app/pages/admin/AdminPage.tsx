@@ -29,7 +29,6 @@ import { Button } from '../../components/ui/button';
 import { Avatar, AvatarFallback } from '../../components/ui/avatar';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { DocumentMetadataDialog } from '../../components/documents/DocumentMetadataDialog';
-import { SubjectPage } from './SubjectPage'; 
 import {
   deleteDocument,
   deleteUser,
@@ -245,9 +244,7 @@ const pageMode = location.pathname.includes('/admin/users')
     ? 'documents'
     : location.pathname.includes('/admin/aichat')
       ? 'aichat'
-      : location.pathname.includes('/admin/subjects')   
-        ? 'subjects'                                     
-        : 'dashboard';
+      : 'dashboard';
 
   const loadAdminData = async () => {
     setLoading(true);
@@ -743,194 +740,199 @@ const pageMode = location.pathname.includes('/admin/users')
         </div>
       )}
       {pageMode === 'users' && (
+        <div className="space-y-6">
         <Card className={glowCard}>
           <CardContent>
             {/* Filter bar */}
-  <div className="space-y-3 mb-4">
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
-      <div className="space-y-1 xl:col-span-1">
-        <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tìm kiếm</label>
-        <input
-          type="text"
-          placeholder="Tìm theo tên hoặc email..."
-          value={userSearch}
-          onChange={(e) => { setUserSearch(e.target.value); setUserPage(1); }}
-          aria-label="Tìm kiếm theo tên hoặc email"
-          className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-sky-400/40"
-        />
+    <div className="space-y-3 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+        <div className="space-y-1 xl:col-span-1">
+          <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tìm kiếm</label>
+          <input
+            type="text"
+            placeholder="Tìm theo tên hoặc email..."
+            value={userSearch}
+            onChange={(e) => { setUserSearch(e.target.value); setUserPage(1); }}
+            aria-label="Tìm kiếm theo tên hoặc email"
+            className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-sky-400/40"
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vai trò</label>
+          <select
+            value={userRoleFilter}
+            onChange={(e) => { setUserRoleFilter(e.target.value); setUserPage(1); }}
+            aria-label="Lọc theo vai trò"
+            className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="">Tất cả vai trò</option>
+            <option value="USER">USER</option>
+            <option value="ADMIN">ADMIN</option>
+            <option value="GUEST">GUEST</option>
+          </select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trạng thái xác thực</label>
+          <select
+            value={userVerifiedFilter}
+            onChange={(e) => { setUserVerifiedFilter(e.target.value); setUserPage(1); }}
+            aria-label="Lọc theo trạng thái xác thực"
+            className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="">Tất cả trạng thái</option>
+            <option value="verified">Đã xác thực</option>
+            <option value="unverified">Chưa xác thực</option>
+          </select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Từ ngày</label>
+          <input
+            type="date"
+            value={userFromDate}
+            onChange={(e) => { setUserFromDate(e.target.value); setUserPage(1); }}
+            aria-label="Lọc từ ngày tạo"
+            className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Đến ngày</label>
+          <input
+            type="date"
+            value={userToDate}
+            onChange={(e) => { setUserToDate(e.target.value); setUserPage(1); }}
+            aria-label="Lọc đến ngày tạo"
+            className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+          />
+        </div>
       </div>
-      <div className="space-y-1">
-        <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vai trò</label>
-        <select
-          value={userRoleFilter}
-          onChange={(e) => { setUserRoleFilter(e.target.value); setUserPage(1); }}
-          aria-label="Lọc theo vai trò"
-          className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
-        >
-          <option value="">Tất cả vai trò</option>
-          <option value="USER">USER</option>
-          <option value="ADMIN">ADMIN</option>
-          <option value="GUEST">GUEST</option>
-        </select>
-      </div>
-      <div className="space-y-1">
-        <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trạng thái xác thực</label>
-        <select
-          value={userVerifiedFilter}
-          onChange={(e) => { setUserVerifiedFilter(e.target.value); setUserPage(1); }}
-          aria-label="Lọc theo trạng thái xác thực"
-          className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
-        >
-          <option value="">Tất cả trạng thái</option>
-          <option value="verified">Đã xác thực</option>
-          <option value="unverified">Chưa xác thực</option>
-        </select>
-      </div>
-      <div className="space-y-1">
-        <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Từ ngày</label>
-        <input
-          type="date"
-          value={userFromDate}
-          onChange={(e) => { setUserFromDate(e.target.value); setUserPage(1); }}
-          aria-label="Lọc từ ngày tạo"
-          className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
-        />
-      </div>
-      <div className="space-y-1">
-        <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Đến ngày</label>
-        <input
-          type="date"
-          value={userToDate}
-          onChange={(e) => { setUserToDate(e.target.value); setUserPage(1); }}
-          aria-label="Lọc đến ngày tạo"
-          className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
-        />
-      </div>
+      {(userSearch || userRoleFilter || userVerifiedFilter || userFromDate || userToDate) && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">
+            Tìm thấy {filteredUsers.length} người dùng phù hợp.
+          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs text-sky-600 hover:text-sky-600"
+            onClick={() => {
+              setUserSearch('');
+              setUserRoleFilter('');
+              setUserVerifiedFilter('');
+              setUserFromDate('');
+              setUserToDate('');
+              setUserPage(1);
+            }}
+          >
+            Xóa bộ lọc
+          </Button>
+        </div>
+      )}
     </div>
-    {(userSearch || userRoleFilter || userVerifiedFilter || userFromDate || userToDate) && (
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground">
-          Tìm thấy {filteredUsers.length} người dùng phù hợp.
-        </p>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-7 text-xs text-sky-600 hover:text-sky-600"
-          onClick={() => {
-            setUserSearch('');
-            setUserRoleFilter('');
-            setUserVerifiedFilter('');
-            setUserFromDate('');
-            setUserToDate('');
-            setUserPage(1);
-          }}
-        >
-          Xóa bộ lọc
-        </Button>
-      </div>
-    )}
-  </div>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Người dùng</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Vai trò</TableHead>
-                    <TableHead>Xác thực</TableHead>
-                    <TableHead>Dung lượng</TableHead>
-                    <TableHead>Ngày tạo</TableHead>
-                    <TableHead className="text-right">Thao tác</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paginatedUsers.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="w-8 h-8 ring-2 ring-indigo-500/20">
-                            <AvatarFallback className="bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white text-xs">
-                              {getInitials(user.fullName, user.email)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="font-medium whitespace-nowrap">{user.fullName || 'Chưa có tên'}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{user.email}</TableCell>
-                      <TableCell>
-                        <select
-                          value={user.role || 'USER'}
-                          disabled={actionLoading === user.id}
-                          onChange={(e) => handleChangeRole(user, e.target.value)}
-                          aria-label={`Vai trò của ${user.fullName || user.email}`}
-                          className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                        >
-                          <option value="USER">USER</option>
-                          <option value="ADMIN">ADMIN</option>
-                          <option value="GUEST">GUEST</option>
-                        </select>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={user.isVerified ? 'default' : 'secondary'}>
-                          {user.isVerified ? 'Đã xác thực' : 'Chưa xác thực'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{formatFileSize(user.usedStorage)}</TableCell>
-                      <TableCell className="text-muted-foreground">{formatDate(user.createdAt)}</TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          disabled={actionLoading === user.id || user.id === currentUser?.id}
-                          onClick={() => handleDeleteUser(user)}
-                        >
-                          <Trash2 className="w-4 h-4 mr-1" />
-                          Xóa
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {!users.length && (
+     </CardContent>
+     </Card>
+              <Card className={glowCard}>
+      <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                        {loading ? 'Đang tải người dùng...' : 'Chưa có người dùng.'}
-                      </TableCell>
+                      <TableHead>Người dùng</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Vai trò</TableHead>
+                      <TableHead>Xác thực</TableHead>
+                      <TableHead>Dung lượng</TableHead>
+                      <TableHead>Ngày tạo</TableHead>
+                      <TableHead className="text-right">Thao tác</TableHead>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-            {users.length > 0 && (
-              <div className="flex items-center justify-between mt-4 px-1">
-                <p className="text-sm text-muted-foreground">
-                  {(userPage - 1) * USER_PAGE_SIZE + 1}–{Math.min(userPage * USER_PAGE_SIZE, users.length)}/{users.length} người dùng
-                </p>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 w-8 p-0"
-                    disabled={userPage === 1}
-                    onClick={() => setUserPage((p) => Math.max(1, p - 1))}
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </Button>
-                  {Array.from({ length: totalUserPages }, (_, i) => i + 1).map((page) => (
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedUsers.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="w-8 h-8 ring-2 ring-indigo-500/20">
+                              <AvatarFallback className="bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white text-xs">
+                                {getInitials(user.fullName, user.email)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium whitespace-nowrap">{user.fullName || 'Chưa có tên'}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                        <TableCell>
+                          <select
+                            value={user.role || 'USER'}
+                            disabled={actionLoading === user.id}
+                            onChange={(e) => handleChangeRole(user, e.target.value)}
+                            aria-label={`Vai trò của ${user.fullName || user.email}`}
+                            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                          >
+                            <option value="USER">USER</option>
+                            <option value="ADMIN">ADMIN</option>
+                            <option value="GUEST">GUEST</option>
+                          </select>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={user.isVerified ? 'default' : 'secondary'}>
+                            {user.isVerified ? 'Đã xác thực' : 'Chưa xác thực'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{formatFileSize(user.usedStorage)}</TableCell>
+                        <TableCell className="text-muted-foreground">{formatDate(user.createdAt)}</TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            disabled={actionLoading === user.id || user.id === currentUser?.id}
+                            onClick={() => handleDeleteUser(user)}
+                          >
+                            <Trash2 className="w-4 h-4 mr-1" />
+                            Xóa
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {!users.length && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                          {loading ? 'Đang tải người dùng...' : 'Chưa có người dùng.'}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+              {users.length > 0 && (
+                <div className="flex items-center justify-between mt-4 px-1">
+                  <p className="text-sm text-muted-foreground">
+                    {(userPage - 1) * USER_PAGE_SIZE + 1}–{Math.min(userPage * USER_PAGE_SIZE, users.length)}/{users.length} người dùng
+                  </p>
+                  <div className="flex items-center gap-1">
                     <Button
-                      key={page}
-                      variant={page === userPage ? 'default' : 'outline'}
+                      variant="outline"
                       size="sm"
-                      className="h-8 w-8 p-0 text-xs"
-                      onClick={() => setUserPage(page)}
+                      className="h-8 w-8 p-0"
+                      disabled={userPage === 1}
+                      onClick={() => setUserPage((p) => Math.max(1, p - 1))}
                     >
-                      {page}
+                      <ChevronLeft className="w-4 h-4" />
                     </Button>
-                  ))}
-                  <Button
-                    variant="outline"
-                    size="sm"
+                    {Array.from({ length: totalUserPages }, (_, i) => i + 1).map((page) => (
+                      <Button
+                        key={page}
+                        variant={page === userPage ? 'default' : 'outline'}
+                        size="sm"
+                        className="h-8 w-8 p-0 text-xs"
+                        onClick={() => setUserPage(page)}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
                     className="h-8 w-8 p-0"
                     disabled={userPage === totalUserPages}
                     onClick={() => setUserPage((p) => Math.min(totalUserPages, p + 1))}
@@ -942,8 +944,10 @@ const pageMode = location.pathname.includes('/admin/users')
             )}
           </CardContent>
         </Card>
+         </div>
       )}
       {pageMode === 'documents' && (
+        <div className="space-y-6">
         <Card className={glowCard}>
           <CardContent>
             {/* Filter bar */}
@@ -1025,8 +1029,36 @@ const pageMode = location.pathname.includes('/admin/users')
                   <span className="text-xs text-muted-foreground whitespace-nowrap">100 MB</span>
                 </div>
               </div>
+              
+        {(docSearch || docTypeFilter || fromDate || toDate || docMaxSize < 100) && (
+                <div className="flex items-center justify-between mt-3">
+                  <p className="text-xs text-muted-foreground">
+                    Tìm thấy {filteredDocuments.length} tài liệu phù hợp.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs text-sky-600 hover:text-sky-600"
+                    onClick={() => {
+                      setDocSearch('');
+                      setDocTypeFilter('');
+                      setFromDate('');
+                      setToDate('');
+                      setDocMaxSize(100);
+                      setDocPage(1);
+                    }}
+                  >
+                    Xóa bộ lọc
+                  </Button>
+                </div>
+              )}
             </div>
+           </CardContent>
+         </Card>
 
+          <Card className={glowCard}>
+            <CardContent>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -1131,6 +1163,7 @@ const pageMode = location.pathname.includes('/admin/users')
             )}
           </CardContent>
         </Card>
+        </div>
       )}
 
       {pageMode === 'aichat' && (
