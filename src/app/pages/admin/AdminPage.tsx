@@ -226,6 +226,8 @@ export function AdminPage() {
   const [docSearch, setDocSearch] = useState('');
   const [docTypeFilter, setDocTypeFilter] = useState('');
   const [docMaxSize, setDocMaxSize] = useState(100);
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
   const USER_PAGE_SIZE = 10;
   const DOC_PAGE_SIZE = 10;
   const location = useLocation();
@@ -398,9 +400,23 @@ export function AdminPage() {
       const matchSearch = !docSearch || name.includes(docSearch.toLowerCase());
       const matchType = !docTypeFilter || ext.toLowerCase().includes(docTypeFilter.toLowerCase());
       const matchSize = size <= docMaxSize;
-      return matchSearch && matchType && matchSize;
+          const created = doc.createdAt ? new Date(doc.createdAt).getTime() : 0;
+
+   const matchFrom =
+  !fromDate || created >= new Date(fromDate).getTime();
+
+   const matchTo =
+  !toDate || created <= new Date(toDate).getTime();
+
+    return (
+      matchSearch &&
+      matchType &&
+      matchSize &&
+      matchFrom &&
+      matchTo
+    );
     });
-  }, [documents, docSearch, docTypeFilter, docMaxSize]);
+  }, [documents, docSearch, docTypeFilter, docMaxSize, fromDate, toDate]);
 
   const totalDocPages = Math.max(1, Math.ceil(filteredDocuments.length / DOC_PAGE_SIZE));
   const paginatedDocuments = useMemo(
@@ -822,7 +838,7 @@ export function AdminPage() {
           <CardContent>
             {/* Filter bar */}
             <div className="space-y-3 mb-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tên tài liệu</label>
                   <input
@@ -848,6 +864,37 @@ export function AdminPage() {
                     ))}
                   </select>
                 </div>
+                <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Từ ngày
+                </label>
+
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => {
+                    setFromDate(e.target.value);
+                    setDocPage(1);
+                  }}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Đến ngày
+                </label>
+
+                <input
+                  type="date"
+                  value={toDate}
+                  onChange={(e) => {
+                    setToDate(e.target.value);
+                    setDocPage(1);
+                  }}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                />
+              </div>
               </div>
               <div className="space-y-1">
                 <div className="flex justify-between text-xs font-semibold uppercase tracking-wide text-muted-foreground">
