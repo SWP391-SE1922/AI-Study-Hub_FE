@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { MessageSquare, RefreshCw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MessageSquare, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
@@ -23,12 +23,15 @@ function formatDate(value?: string) {
 export function AdminAiChatPage() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const loadSessions = async () => {
     setLoading(true);
     try {
       const data = await getChatSessions();
       setSessions(data || []);
+      setPage(1);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Không tải được dữ liệu AI Chat.';
       toast.error(message);
@@ -40,6 +43,9 @@ export function AdminAiChatPage() {
   useEffect(() => {
     loadSessions();
   }, []);
+
+  const totalPages = Math.max(1, Math.ceil(sessions.length / PAGE_SIZE));
+  const paginatedSessions = sessions.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="space-y-6 text-slate-900 dark:text-slate-100">
@@ -88,7 +94,7 @@ export function AdminAiChatPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                sessions.map((session) => (
+                paginatedSessions.map((session) => (
                   <TableRow key={session.id} className="hover:bg-muted/10 border-b border-border last:border-0 transition-colors">
                     <TableCell className="py-4 px-6 font-semibold text-sm">{session.title || 'Cuộc trò chuyện mới'}</TableCell>
                     <TableCell className="py-4 px-4">
@@ -101,6 +107,26 @@ export function AdminAiChatPage() {
               )}
             </TableBody>
           </Table>
+          {sessions.length > 0 && (
+            <div className="flex items-center justify-between mt-4 px-4 pb-4">
+              <p className="text-sm text-muted-foreground">
+                {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, sessions.length)}/{sessions.length} phiên chat
+              </p>
+              <div className="flex items-center gap-1">
+                <Button variant="outline" size="sm" className="h-8 w-8 p-0" disabled={page === 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                  <Button key={p} variant={p === page ? 'default' : 'outline'} size="sm" className="h-8 w-8 p-0 text-xs" onClick={() => setPage(p)}>
+                    {p}
+                  </Button>
+                ))}
+                <Button variant="outline" size="sm" className="h-8 w-8 p-0" disabled={page === totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

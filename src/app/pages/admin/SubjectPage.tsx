@@ -159,8 +159,8 @@ export function SubjectPage() {
       </div>
 
       <Card className={glowCard}>
-        <CardContent className="p-4 md:p-6 overflow-x-auto">
-          <div className="space-y-1 mb-4">
+        <CardContent className="p-4 md:p-6">
+          <div className="space-y-1">
             <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tìm kiếm</label>
             <input
               type="text"
@@ -171,109 +171,116 @@ export function SubjectPage() {
               className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-sky-400/40"
             />
           </div>
-          <Table>
-            <TableHeader className="bg-muted/40 border-b border-border">
-              <TableRow>
-                <TableHead className="py-4 px-6">Tên môn học</TableHead>
-                <TableHead className="py-4 px-4">Mã môn học</TableHead>
-                <TableHead className="py-4 px-4">Mô tả</TableHead>
-                <TableHead className="py-4 px-4">Ngày tạo</TableHead>
-                <TableHead className="py-4 px-6 text-right">Thao tác</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
-                    Đang tải danh sách môn học...
-                  </TableCell>
-                </TableRow>
-              ) : filteredSubjects.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
-                    Không tìm thấy môn học nào.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                paginatedSubjects.map((subject) => (
-                  <TableRow key={subject.id} className="hover:bg-muted/10 border-b border-border last:border-0 transition-colors">
-                    <TableCell className="py-4 px-6 font-semibold text-slate-900 dark:text-slate-100 text-sm">
-                      {subject.name}
-                    </TableCell>
-                    <TableCell className="py-4 px-4 text-sm">
-                      <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400">
-                        {subject.code || '—'}
-                      </span>
-                    </TableCell>
-                    <TableCell className="py-4 px-4 text-muted-foreground text-sm max-w-sm truncate">
-                      {subject.description || 'Chưa có mô tả'}
-                    </TableCell>
-                    <TableCell className="py-4 px-4 text-muted-foreground text-xs">
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5" />
-                        {subject.createdAt ? new Date(subject.createdAt).toLocaleDateString('vi-VN') : '—'}
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-4 px-6 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openEditDialog(subject)}
-                          className="h-8 w-8 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/30 dark:hover:text-indigo-400 rounded-lg"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(subject.id)}
-                          className="h-8 w-8 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/20 dark:hover:text-rose-400 rounded-lg"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
         </CardContent>
       </Card>
-      {filteredSubjects.length > 0 && (
-        <div className="flex items-center justify-between px-1">
-          <p className="text-sm text-muted-foreground">
-            {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filteredSubjects.length)}/{filteredSubjects.length} môn học
-          </p>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline" size="sm" className="h-8 w-8 p-0"
-              disabled={page === 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-              <Button
-                key={p}
-                variant={p === page ? 'default' : 'outline'}
-                size="sm" className="h-8 w-8 p-0 text-xs"
-                onClick={() => setPage(p)}
-              >
-                {p}
-              </Button>
-            ))}
-            <Button
-              variant="outline" size="sm" className="h-8 w-8 p-0"
-              disabled={page === totalPages}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
+
+      <Card className={glowCard}>
+        <CardContent className="p-4 md:p-6">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-muted/40 border-b border-border">
+                <TableRow>
+                  <TableHead className="py-4 px-6">Tên môn học</TableHead>
+                  <TableHead className="py-4 px-4">Mã môn học</TableHead>
+                  <TableHead className="py-4 px-4">Mô tả</TableHead>
+                  <TableHead className="py-4 px-4">Ngày tạo</TableHead>
+                  <TableHead className="py-4 px-6 text-right">Thao tác</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
+                      Đang tải danh sách môn học...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredSubjects.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
+                      Không tìm thấy môn học nào.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  paginatedSubjects.map((subject) => (
+                    <TableRow key={subject.id} className="hover:bg-muted/10 border-b border-border last:border-0 transition-colors">
+                      <TableCell className="py-4 px-6 font-semibold text-slate-900 dark:text-slate-100 text-sm">
+                        {subject.name}
+                      </TableCell>
+                      <TableCell className="py-4 px-4 text-sm">
+                        <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400">
+                          {subject.code || '—'}
+                        </span>
+                      </TableCell>
+                      <TableCell className="py-4 px-4 text-muted-foreground text-sm max-w-sm truncate">
+                        {subject.description || 'Chưa có mô tả'}
+                      </TableCell>
+                      <TableCell className="py-4 px-4 text-muted-foreground text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5" />
+                          {subject.createdAt ? new Date(subject.createdAt).toLocaleDateString('vi-VN') : '—'}
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-4 px-6 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEditDialog(subject)}
+                            className="h-8 w-8 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/30 dark:hover:text-indigo-400 rounded-lg"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDelete(subject.id)}
+                            className="h-8 w-8 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/20 dark:hover:text-rose-400 rounded-lg"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
           </div>
-        </div>
-      )}
+          {filteredSubjects.length > 0 && (
+            <div className="flex items-center justify-between mt-4 px-1">
+              <p className="text-sm text-muted-foreground">
+                {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filteredSubjects.length)}/{filteredSubjects.length} môn học
+              </p>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline" size="sm" className="h-8 w-8 p-0"
+                  disabled={page === 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                  <Button
+                    key={p}
+                    variant={p === page ? 'default' : 'outline'}
+                    size="sm" className="h-8 w-8 p-0 text-xs"
+                    onClick={() => setPage(p)}
+                  >
+                    {p}
+                  </Button>
+                ))}
+                <Button
+                  variant="outline" size="sm" className="h-8 w-8 p-0"
+                  disabled={page === totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
       {/* Add / Edit Dialog */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="sm:max-w-[450px] rounded-3xl p-6 border-border bg-background">
