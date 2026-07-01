@@ -594,7 +594,7 @@ const pageMode = location.pathname.includes('/admin/users')
       return {
         icon: FileText,
         title: 'Quản lý tài liệu',
-        description: 'Xem danh sách tài liệu từ backend và xóa tài liệu không phù hợp.',
+        description: 'Xem danh sách tài liệu, sửa và xóa tài liệu không phù hợp.',
       };
     }
 
@@ -1300,17 +1300,6 @@ const pageMode = location.pathname.includes('/admin/users')
                     </span>
                   </div>
                   <p className="mt-2 text-xs text-muted-foreground">Ngày tạo: {formatDate(version.createdAt)}</p>
-                  {version.fileUrl && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="mt-3 rounded-xl"
-                      onClick={() => window.open(toAbsoluteFileUrl(version.fileUrl), '_blank', 'noopener,noreferrer')}
-                    >
-                      Mở file version này
-                    </Button>
-                  )}
                 </div>
               ))
             ) : (

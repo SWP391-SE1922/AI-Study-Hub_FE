@@ -56,7 +56,7 @@ export function AdminAiChatPage() {
           </div>
           <div>
             <h1 className="text-3xl font-bold">AI Chat Admin</h1>
-            <p className="text-muted-foreground mt-1">Theo dõi các phiên chat AI đang lấy từ backend.</p>
+            <p className="text-muted-foreground mt-1">Theo dõi các phiên chat AI.</p>
           </div>
         </div>
         <Button onClick={loadSessions} disabled={loading} variant="outline" className="gap-2 hover:border-sky-400/50 hover:text-sky-500">

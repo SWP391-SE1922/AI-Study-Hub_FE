@@ -18,13 +18,28 @@ export function AdminLayout() {
     window.location.href = '/';
   };
 
-  const adminMenuItems = [
-    { path: '/admin', label: 'Dashboard Admin', icon: LayoutDashboard, exact: true },
-    { path: '/admin/users', label: 'Quản lý User', icon: Users },
-    { path: '/admin/documents', label: 'Quản lý Tài liệu', icon: FileText },
-    { path: '/admin/category', label: 'Quản lý Danh mục', icon: Tag },
-    { path: '/admin/subjects', label: 'Quản lý Môn học', icon: BookOpen },
-    { path: '/admin/aichat', label: 'AI Chat Admin', icon: MessageSquare },
+  const adminMenuGroups = [
+    {
+      title: 'TỔNG QUAN',
+      items: [
+        { path: '/admin', label: 'Dashboard Admin', icon: LayoutDashboard, exact: true },
+        { path: '/admin/users', label: 'Quản lý User', icon: Users },
+      ],
+    },
+    {
+      title: 'QUẢN LÝ NỘI DUNG',
+      items: [
+        { path: '/admin/subjects', label: 'Quản lý Môn học', icon: BookOpen },
+        { path: '/admin/category', label: 'Quản lý Danh mục', icon: Tag },
+        { path: '/admin/documents', label: 'Quản lý Tài liệu', icon: FileText },
+      ],
+    },
+    {
+      title: 'TÍNH NĂNG AI',
+      items: [
+        { path: '/admin/aichat', label: 'AI Chat Admin', icon: MessageSquare },
+      ],
+    },
   ];
 
   return (
@@ -167,38 +182,39 @@ export function AdminLayout() {
               </Button>
             </div>
 
-            <p className="hidden lg:block px-4 pb-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">Quản trị</p>
+            {adminMenuGroups.map((group) => (
+              <div key={group.title} className="space-y-1.5">
+                <p className="px-4 pb-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">{group.title}</p>
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = item.exact
+                    ? location.pathname === item.path
+                    : location.pathname.startsWith(item.path);
 
-            {adminMenuItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = item.exact
-                ? location.pathname === item.path
-                : location.pathname.startsWith(item.path);
+                  return (
+                    <Link key={item.path} to={item.path} onClick={() => setSidebarOpen(false)} className="block">
+                      <span
+                        className={`group flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-300 relative overflow-hidden
+                        ${isActive
+                            ? 'bg-gradient-to-r from-indigo-500 to-fuchsia-500 text-white shadow-lg shadow-fuchsia-500/30 translate-x-0.5'
+                            : 'text-slate-300 hover:text-white hover:bg-white/5 hover:translate-x-1 hover:shadow-[0_0_18px_-6px_rgba(167,139,250,0.6)]'
+                          }`}
+                      >
+                        <span
+                          className={`absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full bg-white/90 transition-all duration-300 ${isActive ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-0'
+                            }`}
+                        />
+                        {isActive && <span className="admin-active-shimmer absolute inset-0 pointer-events-none" />}
 
-              return (
-                <Link key={item.path} to={item.path} onClick={() => setSidebarOpen(false)} className="block">
-                  <span
-                    className={`group flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-300 relative overflow-hidden
-                    ${isActive
-                        ? 'bg-gradient-to-r from-indigo-500 to-fuchsia-500 text-white shadow-lg shadow-fuchsia-500/30 translate-x-0.5'
-                        : 'text-slate-300 hover:text-white hover:bg-white/5 hover:translate-x-1 hover:shadow-[0_0_18px_-6px_rgba(167,139,250,0.6)]'
-                      }`}
-                  >
-                    {/* active-state left indicator bar */}
-                    <span
-                      className={`absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full bg-white/90 transition-all duration-300 ${isActive ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-0'
-                        }`}
-                    />
-                    {/* moving shimmer highlight on the active pill */}
-                    {isActive && <span className="admin-active-shimmer absolute inset-0 pointer-events-none" />}
-
-                    <Icon className={`w-4 h-4 shrink-0 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110 group-hover:-rotate-6'}`} />
-                    <span className="relative">{item.label}</span>
-                    {isActive && <Sparkles className="w-3.5 h-3.5 ml-auto opacity-80 relative" />}
-                  </span>
-                </Link>
-              );
-            })}
+                        <Icon className={`w-4 h-4 shrink-0 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110 group-hover:-rotate-6'}`} />
+                        <span className="relative">{item.label}</span>
+                        {isActive && <Sparkles className="w-3.5 h-3.5 ml-auto opacity-80 relative" />}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            ))}
           </div>
         </div>
 

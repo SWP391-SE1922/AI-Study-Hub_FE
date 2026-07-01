@@ -170,8 +170,8 @@ export function DocumentsPage() {
         categoryId: selectedCategory !== 'All' ? selectedCategory : undefined,
         // Gửi subjectId (UUID) để backend lọc chính xác
         subjectId: selectedSubject !== 'All' ? selectedSubject : undefined,
-        // Chỉ lấy tài liệu của chính người dùng đang đăng nhập
-        uploadedBy: currentUserId || undefined,
+        // Backend không chấp nhận uploadedBy qua query cho endpoint này.
+        // Lọc thêm phía client vẫn đảm bảo chỉ hiện tài liệu của người dùng hiện tại.
         limit: 50,
         sortBy: 'createdAt',
         sortOrder: 'desc',

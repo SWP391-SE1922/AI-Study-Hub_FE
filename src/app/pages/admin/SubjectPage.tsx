@@ -157,7 +157,7 @@ export function SubjectPage() {
           </div>
           <div>
             <h1 className="text-3xl font-bold">Quản lý môn học</h1>
-            <p className="text-muted-foreground mt-1">Danh sách các môn học dùng để gắn vào tài liệu.</p>
+            <p className="text-muted-foreground mt-1">Danh sách các môn học.</p>
           </div>
         </div>
         <Button onClick={openAddDialog} size="sm" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl">

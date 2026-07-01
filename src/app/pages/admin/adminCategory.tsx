@@ -145,7 +145,7 @@ export function CategoryPage() {
           </div>
           <div>
             <h1 className="text-3xl font-bold">Quản lý danh mục tài liệu</h1>
-            <p className="text-muted-foreground mt-1">Danh sách các danh mục phân loại tài liệu (Kỹ thuật phần mềm, Trí tuệ nhân tạo, v.v.).</p>
+            <p className="text-muted-foreground mt-1">Danh sách các danh mục (Kinh tế, Lập trình v.v.).</p>
           </div>
         </div>
         <Button onClick={openAddDialog} size="sm" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl">
