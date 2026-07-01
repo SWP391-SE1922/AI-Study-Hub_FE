@@ -82,6 +82,14 @@ function getDateKey(value?: string) {
   return date.toISOString().slice(0, 10);
 }
 
+function normalizeSearchText(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .trim();
+}
+
 // Glow shadow dùng chung cho các card — ánh sáng xanh dương (sky/cyan), đồng bộ với Dashboard người dùng.
 const glowCard =
   'border-sky-500/10 dark:border-sky-400/10 bg-white dark:bg-slate-900 ' +
@@ -445,11 +453,12 @@ const pageMode = location.pathname.includes('/admin/users')
   );
   const filteredDocuments = useMemo(() => {
     return documents.filter((doc) => {
-      const name = doc.title?.toLowerCase() || '';
-      const classification = (doc.category?.name || doc.subjectRef?.name || doc.subject || '').toLowerCase();
+      const name = normalizeSearchText(doc.title || '');
+      const classification = normalizeSearchText(doc.category?.name || doc.subjectRef?.name || doc.subject || '');
+      const normalizedSearch = normalizeSearchText(docSearch);
       const size = Number(doc.fileSize || 0) / (1024 * 1024);
-      const matchSearch = !docSearch || name.includes(docSearch.toLowerCase());
-      const matchType = !docTypeFilter || classification === docTypeFilter.toLowerCase();
+      const matchSearch = !docSearch || name.includes(normalizedSearch);
+      const matchType = !docTypeFilter || classification === normalizeSearchText(docTypeFilter);
       const matchSize = size <= docMaxSize;
       const created = doc.createdAt ? new Date(doc.createdAt).getTime() : 0;
 

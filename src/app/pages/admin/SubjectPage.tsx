@@ -25,6 +25,14 @@ const glowCard =
   'dark:hover:shadow-[0_0_0_1px_rgba(56,189,248,0.18),0_12px_45px_-8px_rgba(56,189,248,0.45)] ' +
   'transition-shadow duration-300';
 
+function normalizeSearchText(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .trim();
+}
+
 // Khớp với schema thật của backend: POST/PUT /api/subjects yêu cầu name, code, description
 interface Subject {
   id: string;
@@ -132,11 +140,11 @@ export function SubjectPage() {
     }
   };
 
-  const filteredSubjects = subjects.filter(
-    (s) =>
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      (s.code && s.code.toLowerCase().includes(search.toLowerCase())) ||
-      (s.description && s.description.toLowerCase().includes(search.toLowerCase()))
+  const normalizedSearch = normalizeSearchText(search);
+  const filteredSubjects = subjects.filter((s) =>
+    normalizeSearchText(s.name).includes(normalizedSearch) ||
+    normalizeSearchText(s.code || '').includes(normalizedSearch) ||
+    normalizeSearchText(s.description || '').includes(normalizedSearch),
   );
   const totalPages = Math.max(1, Math.ceil(filteredSubjects.length / PAGE_SIZE));
   const paginatedSubjects = filteredSubjects.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);

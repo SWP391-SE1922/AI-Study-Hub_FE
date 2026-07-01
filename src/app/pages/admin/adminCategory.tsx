@@ -32,6 +32,14 @@ interface Category {
   createdAt: string;
 }
 
+function normalizeSearchText(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .trim();
+}
+
 export function CategoryPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -123,10 +131,8 @@ export function CategoryPage() {
     }
   };
 
-  const filteredCategories = categories.filter(
-    (c) =>
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      (c.description && c.description.toLowerCase().includes(search.toLowerCase()))
+  const filteredCategories = categories.filter((c) =>
+    normalizeSearchText(c.name).includes(normalizeSearchText(search)),
   );
   const totalPages = Math.max(1, Math.ceil(filteredCategories.length / PAGE_SIZE));
   const paginatedCategories = filteredCategories.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
