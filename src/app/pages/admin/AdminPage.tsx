@@ -227,6 +227,8 @@ export function AdminPage() {
   const [userToDate, setUserToDate] = useState('');
   const [userPage, setUserPage] = useState(1);
   const [docPage, setDocPage] = useState(1);
+  const [recentPage, setRecentPage] = useState(1);
+  const [topPage, setTopPage] = useState(1);
   const [docSearch, setDocSearch] = useState('');
   const [docTypeFilter, setDocTypeFilter] = useState('');
   const [docMaxSize, setDocMaxSize] = useState(100);
@@ -234,6 +236,8 @@ export function AdminPage() {
   const [toDate, setToDate] = useState('');
   const USER_PAGE_SIZE = 10;
   const DOC_PAGE_SIZE = 10;
+  const RECENT_DOCS_PAGE_SIZE = 5;
+  const TOP_DOCS_PAGE_SIZE = 5;
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -386,7 +390,37 @@ const pageMode = location.pathname.includes('/admin/users')
     [uploadTimeline],
   );
 
-  const recentDocuments = useMemo(() => documents.slice(0, 5), [documents]);
+  const sortedRecentDocuments = useMemo(
+    () =>
+      [...documents]
+        .sort((a, b) => (new Date(b.createdAt).getTime() || 0) - (new Date(a.createdAt).getTime() || 0)),
+    [documents],
+  );
+
+  const totalRecentPages = Math.max(1, Math.ceil(sortedRecentDocuments.length / RECENT_DOCS_PAGE_SIZE));
+  const paginatedRecentDocuments = useMemo(
+    () =>
+      sortedRecentDocuments.slice((recentPage - 1) * RECENT_DOCS_PAGE_SIZE, recentPage * RECENT_DOCS_PAGE_SIZE),
+    [sortedRecentDocuments, recentPage],
+  );
+
+  const sortedTopDocuments = useMemo(
+    () =>
+      [...documents].sort(
+        (a, b) =>
+          (Number(b.downloadCount || 0) - Number(a.downloadCount || 0)) ||
+          ((new Date(b.createdAt).getTime() || 0) - (new Date(a.createdAt).getTime() || 0)),
+      ),
+    [documents],
+  );
+
+  const totalTopPages = Math.max(1, Math.ceil(sortedTopDocuments.length / TOP_DOCS_PAGE_SIZE));
+  const paginatedTopDocuments = useMemo(
+    () =>
+      sortedTopDocuments.slice((topPage - 1) * TOP_DOCS_PAGE_SIZE, topPage * TOP_DOCS_PAGE_SIZE),
+    [sortedTopDocuments, topPage],
+  );
+
   const filteredUsers = useMemo(() => {
     return users.filter((user) => {
       const name = (user.fullName || '').toLowerCase();
@@ -412,26 +446,23 @@ const pageMode = location.pathname.includes('/admin/users')
   const filteredDocuments = useMemo(() => {
     return documents.filter((doc) => {
       const name = doc.title?.toLowerCase() || '';
-      const ext = doc.title?.split('.').pop() || '';
+      const classification = (doc.category?.name || doc.subjectRef?.name || doc.subject || '').toLowerCase();
       const size = Number(doc.fileSize || 0) / (1024 * 1024);
       const matchSearch = !docSearch || name.includes(docSearch.toLowerCase());
-      const matchType = !docTypeFilter || ext.toLowerCase().includes(docTypeFilter.toLowerCase());
+      const matchType = !docTypeFilter || classification === docTypeFilter.toLowerCase();
       const matchSize = size <= docMaxSize;
-          const created = doc.createdAt ? new Date(doc.createdAt).getTime() : 0;
+      const created = doc.createdAt ? new Date(doc.createdAt).getTime() : 0;
 
-   const matchFrom =
-  !fromDate || created >= new Date(fromDate).getTime();
+      const matchFrom = !fromDate || created >= new Date(fromDate).getTime();
+      const matchTo = !toDate || created <= new Date(toDate).getTime();
 
-   const matchTo =
-  !toDate || created <= new Date(toDate).getTime();
-
-    return (
-      matchSearch &&
-      matchType &&
-      matchSize &&
-      matchFrom &&
-      matchTo
-    );
+      return (
+        matchSearch &&
+        matchType &&
+        matchSize &&
+        matchFrom &&
+        matchTo
+      );
     });
   }, [documents, docSearch, docTypeFilter, docMaxSize, fromDate, toDate]);
 
@@ -444,10 +475,11 @@ const pageMode = location.pathname.includes('/admin/users')
   const docTypes = useMemo(() => {
     const types = new Set<string>();
     documents.forEach((doc) => {
-      const ext = doc.title?.split('.').pop() || '';
-      if (ext) types.add(ext.toLowerCase());
+      const classification = doc.category?.name || doc.subjectRef?.name || doc.subject;
+      if (classification) types.add(classification);
+      else types.add('Chưa phân loại');
     });
-    return Array.from(types).sort();
+    return Array.from(types).sort((a, b) => a.localeCompare(b, 'vi'));
   }, [documents]);
   const topDocuments = useMemo(
     () => [...documents].sort((a, b) => Number(b.downloadCount || 0) - Number(a.downloadCount || 0)).slice(0, 5),
@@ -670,7 +702,7 @@ const pageMode = location.pathname.includes('/admin/users')
                   <CardDescription>5 tài liệu vừa được tải lên hệ thống.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {recentDocuments.map((doc) => (
+                  {paginatedRecentDocuments.map((doc) => (
                     <div key={doc.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/20 p-3 hover:shadow-[0_0_20px_-10px_rgba(56,189,248,0.6)] transition-shadow">
                       <div className="min-w-0">
                         <p className="font-medium truncate">{doc.title}</p>
@@ -681,10 +713,45 @@ const pageMode = location.pathname.includes('/admin/users')
                       <Badge variant="secondary" className="shrink-0">{formatFileSize(doc.fileSize)}</Badge>
                     </div>
                   ))}
-                  {!recentDocuments.length && (
+                  {!paginatedRecentDocuments.length && (
                     <p className="text-center text-muted-foreground py-8">{loading ? 'Đang tải...' : 'Chưa có tài liệu.'}</p>
                   )}
                 </CardContent>
+                {sortedRecentDocuments.length > 0 && (
+                  <div className="flex items-center justify-center mt-4 px-1">
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        disabled={recentPage === 1}
+                        onClick={() => setRecentPage((p) => Math.max(1, p - 1))}
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </Button>
+                      {Array.from({ length: totalRecentPages }, (_, i) => i + 1).map((page) => (
+                        <Button
+                          key={page}
+                          variant={page === recentPage ? 'default' : 'outline'}
+                          size="sm"
+                          className="h-8 w-8 p-0 text-xs"
+                          onClick={() => setRecentPage(page)}
+                        >
+                          {page}
+                        </Button>
+                      ))}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        disabled={recentPage === totalRecentPages}
+                        onClick={() => setRecentPage((p) => Math.min(totalRecentPages, p + 1))}
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </Card>
 
               <Card className={glowCard}>
@@ -698,11 +765,11 @@ const pageMode = location.pathname.includes('/admin/users')
                   <CardDescription>Top tài liệu có lượt tải cao nhất.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {topDocuments.map((doc, index) => (
+                  {paginatedTopDocuments.map((doc, index) => (
                     <div key={doc.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/20 p-3 hover:shadow-[0_0_20px_-10px_rgba(56,189,248,0.6)] transition-shadow">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="w-8 h-8 rounded-lg bg-sky-50 dark:bg-sky-500/10 text-sky-500 flex items-center justify-center text-sm font-bold">
-                          {index + 1}
+                          {(topPage - 1) * TOP_DOCS_PAGE_SIZE + index + 1}
                         </div>
                         <div className="min-w-0">
                           <p className="font-medium truncate">{doc.title}</p>
@@ -712,10 +779,45 @@ const pageMode = location.pathname.includes('/admin/users')
                       <Badge className="shrink-0">{doc.downloadCount || 0} lượt tải</Badge>
                     </div>
                   ))}
-                  {!topDocuments.length && (
+                  {!paginatedTopDocuments.length && (
                     <p className="text-center text-muted-foreground py-8">{loading ? 'Đang tải...' : 'Chưa có tài liệu.'}</p>
                   )}
                 </CardContent>
+                {sortedTopDocuments.length > 0 && (
+                  <div className="flex items-center justify-center mt-4 px-1">
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        disabled={topPage === 1}
+                        onClick={() => setTopPage((p) => Math.max(1, p - 1))}
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </Button>
+                      {Array.from({ length: totalTopPages }, (_, i) => i + 1).map((page) => (
+                        <Button
+                          key={page}
+                          variant={page === topPage ? 'default' : 'outline'}
+                          size="sm"
+                          className="h-8 w-8 p-0 text-xs"
+                          onClick={() => setTopPage(page)}
+                        >
+                          {page}
+                        </Button>
+                      ))}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        disabled={topPage === totalTopPages}
+                        onClick={() => setTopPage((p) => Math.min(totalTopPages, p + 1))}
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </Card>
             </div>
           </div>
@@ -947,16 +1049,16 @@ const pageMode = location.pathname.includes('/admin/users')
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Loại tệp</label>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Phân loại</label>
                   <select
                     value={docTypeFilter}
                     onChange={(e) => { setDocTypeFilter(e.target.value); setDocPage(1); }}
-                    aria-label="Lọc theo loại tệp"
+                    aria-label="Lọc theo phân loại"
                     className="w-full h-11 rounded-xl border border-input bg-background px-4 text-sm"
                   >
-                    <option value="">Tất cả loại</option>
+                    <option value="">Tất cả phân loại</option>
                     {docTypes.map((t) => (
-                      <option key={t} value={t}>{t.toUpperCase()}</option>
+                      <option key={t} value={t}>{t}</option>
                     ))}
                   </select>
                 </div>
@@ -1056,8 +1158,8 @@ const pageMode = location.pathname.includes('/admin/users')
                       <TableCell className="py-4 px-4 text-muted-foreground">{formatFileSize(doc.fileSize)}</TableCell>
                       <TableCell className="py-4 px-4 text-center text-muted-foreground">{doc.downloadCount || 0}</TableCell>
                       <TableCell className="py-4 px-4 text-muted-foreground">{formatDate(doc.createdAt)}</TableCell>
-                      <TableCell className="py-4 px-6 text-right max-w-[144px] whitespace-nowrap">
-                        <div className="inline-flex items-center justify-end gap-0.5">
+                      <TableCell className="py-4 px-6 text-center max-w-[144px] whitespace-nowrap">
+                        <div className="inline-flex items-center justify-center gap-0.5">
                           <Button
                             variant="ghost"
                             size="icon"
