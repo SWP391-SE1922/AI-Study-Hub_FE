@@ -1,11 +1,19 @@
 import { useEffect, useState } from 'react';
-import { AlertCircle, MessageSquare, RefreshCw } from 'lucide-react';
+import { MessageSquare, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { getChatSessions, type ChatSession } from '../../services/api';
+
+const glowCard =
+  'border-sky-500/10 dark:border-sky-400/10 bg-white dark:bg-slate-900 ' +
+  'shadow-[0_0_0_1px_rgba(56,189,248,0.06),0_8px_30px_-8px_rgba(56,189,248,0.35)] ' +
+  'dark:shadow-[0_0_0_1px_rgba(56,189,248,0.08),0_8px_35px_-6px_rgba(56,189,248,0.25)] ' +
+  'hover:shadow-[0_0_0_1px_rgba(56,189,248,0.12),0_12px_45px_-8px_rgba(56,189,248,0.55)] ' +
+  'dark:hover:shadow-[0_0_0_1px_rgba(56,189,248,0.18),0_12px_45px_-8px_rgba(56,189,248,0.45)] ' +
+  'transition-shadow duration-300';
 
 function formatDate(value?: string) {
   if (!value) return 'Không rõ';
@@ -15,17 +23,14 @@ function formatDate(value?: string) {
 export function AdminAiChatPage() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const loadSessions = async () => {
     setLoading(true);
-    setError(null);
     try {
       const data = await getChatSessions();
       setSessions(data || []);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Không tải được dữ liệu AI Chat.';
-      setError(message);
       toast.error(message);
     } finally {
       setLoading(false);
@@ -38,28 +43,23 @@ export function AdminAiChatPage() {
 
   return (
     <div className="space-y-6 text-slate-900 dark:text-slate-100">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-[1.75rem] border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-700/80 dark:bg-slate-950">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <MessageSquare className="w-6 h-6 text-indigo-500" />
-            AI Chat Admin
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">Theo dõi các phiên chat AI đang lấy từ backend.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 bg-gradient-to-br from-violet-500 via-indigo-500 to-fuchsia-500 rounded-xl flex items-center justify-center shadow-lg shadow-fuchsia-500/30">
+            <MessageSquare className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold">AI Chat Admin</h1>
+            <p className="text-muted-foreground mt-1">Theo dõi các phiên chat AI đang lấy từ backend.</p>
+          </div>
         </div>
-        <Button onClick={loadSessions} disabled={loading} variant="outline" className="gap-2 rounded-xl">
+        <Button onClick={loadSessions} disabled={loading} variant="outline" className="gap-2 hover:border-sky-400/50 hover:text-sky-500">
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           Tải lại
         </Button>
       </div>
 
-      {error && (
-        <div className="flex items-center gap-3 p-5 rounded-2xl border border-rose-200/50 bg-rose-50/50 text-rose-600 dark:border-rose-950/20 dark:bg-rose-950/10 dark:text-rose-400">
-          <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          <p className="text-sm font-medium">{error}</p>
-        </div>
-      )}
-
-      <Card className="border-border/50 rounded-2xl overflow-hidden shadow-sm">
+      <Card className={glowCard}>
         <CardHeader>
           <CardTitle>Danh sách phiên chat</CardTitle>
           <CardDescription>Tổng cộng {sessions.length} phiên chat.</CardDescription>

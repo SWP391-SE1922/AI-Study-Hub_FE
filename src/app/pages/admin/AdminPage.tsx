@@ -12,7 +12,7 @@ import {
   FolderOpen,
   HardDrive,
   History,
-  MessageSquare,
+
   RefreshCw,
   Pencil,
   Shield,
@@ -33,7 +33,7 @@ import {
   deleteDocument,
   deleteUser,
   getCategories,
-  getChatSessions,
+
   getDocuments,
   getDocumentVersions,
   getMe,
@@ -212,7 +212,6 @@ export function AdminPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
-  const [chatCount, setChatCount] = useState(0);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -242,8 +241,6 @@ const pageMode = location.pathname.includes('/admin/users')
   ? 'users'
   : location.pathname.includes('/admin/documents')
     ? 'documents'
-    : location.pathname.includes('/admin/aichat')
-      ? 'aichat'
       : 'dashboard';
 
   const loadAdminData = async () => {
@@ -252,7 +249,6 @@ const pageMode = location.pathname.includes('/admin/users')
     // Không dùng Promise.all cứng để tránh 1 API lỗi làm hỏng toàn bộ trang admin.
     const nextUsers: User[] = [];
     let nextDocuments: DocumentItem[] = [];
-    let nextChatCount = 0;
     let nextCategories: CategoryItem[] = [];
     let nextCurrentUser: User | null = null;
 
@@ -277,13 +273,6 @@ const pageMode = location.pathname.includes('/admin/users')
     }
 
     try {
-      const chatSessions = await getChatSessions();
-      nextChatCount = chatSessions.length || 0;
-    } catch {
-      nextChatCount = 0;
-    }
-
-    try {
       nextCurrentUser = await getMe();
     } catch {
       nextCurrentUser = null;
@@ -292,7 +281,6 @@ const pageMode = location.pathname.includes('/admin/users')
     setUsers(nextUsers);
     setDocuments(nextDocuments);
     setCategories(nextCategories);
-    setChatCount(nextChatCount);
     setCurrentUser(nextCurrentUser);
     if (pageMode === "documents") {
     setDocSearch("");
@@ -569,13 +557,7 @@ const pageMode = location.pathname.includes('/admin/users')
       };
     }
 
-    if (pageMode === 'aichat') {
-      return {
-        icon: MessageSquare,
-        title: 'AI Chat Admin',
-        description: 'Theo dõi trạng thái sử dụng tính năng AI Chat trong hệ thống.',
-      };
-    }
+   
 
     return {
       icon: Shield,
@@ -1166,72 +1148,7 @@ const pageMode = location.pathname.includes('/admin/users')
         </div>
       )}
 
-      {pageMode === 'aichat' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className={glowCard}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Chat sessions</p>
-                    <h3 className="text-2xl font-bold mt-1">{chatCount}</h3>
-                    <p className="text-xs text-muted-foreground mt-1">Theo dữ liệu API hiện tại</p>
-                  </div>
-                  <div className="w-12 h-12 bg-sky-50 dark:bg-sky-500/10 rounded-xl flex items-center justify-center">
-                    <MessageSquare className="w-6 h-6 text-sky-500" />
-                  </div>
-                </div>
-
-              </CardContent>
-            </Card>
-
-            <Card className={glowCard}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Người dùng hệ thống</p>
-                    <h3 className="text-2xl font-bold mt-1">{users.length}</h3>
-                    <p className="text-xs text-muted-foreground mt-1">Có thể dùng AI Chat</p>
-                  </div>
-                  <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-500/10 rounded-xl flex items-center justify-center">
-                    <Users className="w-6 h-6 text-indigo-500" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className={glowCard}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Trạng thái</p>
-                    <h3 className="text-2xl font-bold mt-1">API</h3>
-                    <p className="text-xs text-muted-foreground mt-1">Lấy từ /api/ai/sessions</p>
-                  </div>
-                  <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl flex items-center justify-center">
-                    <Activity className="w-6 h-6 text-emerald-500" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card className={glowCard}>
-            <CardHeader>
-              <CardTitle>Ghi chú AI Chat Admin</CardTitle>
-              <CardDescription>
-                Trang này tách riêng khỏi Dashboard và Quản lý User. Nếu backend có API thống kê toàn bộ chat của hệ thống,
-                bạn có thể mở rộng thêm bảng lịch sử chat tại đây.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
-                Hiện frontend đang đọc số session qua API AI hiện có. Không dùng giao diện quản lý user cho mục AI Chat nữa.
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+    
       <DocumentMetadataDialog
         open={Boolean(editingDocument)}
         title="Sửa tài liệu"
