@@ -210,7 +210,7 @@ export function CategoryPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => openEditDialog(cat)}
-                            className="h-8 w-8 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/30 dark:hover:text-indigo-400 rounded-lg"
+                            className="h-8 w-8 rounded-full p-0 text-amber-600 hover:text-amber-700"
                           >
                             <Edit className="w-4 h-4" />
                           </Button>
@@ -218,7 +218,7 @@ export function CategoryPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => handleDelete(cat.id)}
-                            className="h-8 w-8 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/20 dark:hover:text-rose-400 rounded-lg"
+                            className="h-8 w-8 rounded-full p-0 text-destructive hover:text-destructive/80"
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
