@@ -12,14 +12,13 @@ import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { DocumentsPage } from './pages/documents/DocumentsPage';
 import { DocumentDetailPage } from './pages/documents/DocumentDetailPage';
+import { PublicDocumentsPage } from './pages/documents/PublicDocumentsPage'; // <-- Import trang mới ở đây
 import { ProfilePage } from './pages/ProfilePage';
 import { ChatPage } from './pages/ChatPage';
 import { AdminPage } from './pages/admin/AdminPage';
 import { CategoryPage } from './pages/admin/adminCategory';
-import { SubjectPage } from './pages/admin/SubjectPage'; 
+import { SubjectPage } from './pages/admin/SubjectPage';
 import { AdminDocumentDetailPage } from './pages/admin/AdminDocumentDetailPage';
-
-
 
 // Layouts
 import { MainLayout } from './components/layout/MainLayout';
@@ -86,7 +85,6 @@ export default function App() {
         <Routes>
           <Route path="/" element={isAuthenticated ? <Navigate to={homePath} replace /> : <LandingPage />} />
 
-
           <Route element={<AuthLayout />}>
             <Route path="/login" element={isAuthenticated ? <Navigate to={homePath} replace /> : <LoginPage />} />
             <Route path="/register" element={isAuthenticated ? <Navigate to={homePath} replace /> : <RegisterPage />} />
@@ -99,6 +97,7 @@ export default function App() {
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/documents" element={<DocumentsPage />} />
               <Route path="/documents/:id" element={<DocumentDetailPage />} />
+              <Route path="/public-documents" element={<PublicDocumentsPage />} /> {/* <-- Thêm Route xem tài liệu công cộng */}
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/chat" element={<ChatPage />} />
             </Route>
@@ -112,7 +111,7 @@ export default function App() {
               <Route path="/admin/documents/:id" element={<AdminDocumentDetailPage />} />
               <Route path="/admin/aichat" element={<AdminPage />} />
               <Route path="/admin/category" element={<CategoryPage />} />
-              <Route path="/admin/subjects" element={<SubjectPage />} />  
+              <Route path="/admin/subjects" element={<SubjectPage />} />
             </Route>
           </Route>
 
