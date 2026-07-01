@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertCircle, Download, Eye, FileText, History, Pencil, Search, Trash2, Upload, Globe, Lock, Loader2 } from 'lucide-react';
+import { AlertCircle, ChevronLeft, ChevronRight, Download, Eye, FileText, History, Pencil, Search, Trash2, Upload, Globe, Lock, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '../../components/ui/button';
 import {
@@ -20,13 +20,14 @@ import {
   deleteDocument,
   downloadDocument,
   getCategories,
-  getDocuments,
+  getMyDocuments,
   getToken,
   toAbsoluteFileUrl,
   updateDocument,
   type CategoryItem,
   type DocumentItem,
   type DocumentMetadata,
+  type Pagination,
 } from '../../services/api';
 
 type SubjectItem = {
@@ -51,16 +52,6 @@ type ApiEnvelope<T> = {
 };
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3636/api').replace(/\/$/, '');
-
-// Lấy id user hiện tại từ localStorage (đã lưu lúc login, xem hàm saveAuth trong services/api.ts)
-function getCurrentUserId(): string | null {
-  try {
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    return user?.id || null;
-  } catch {
-    return null;
-  }
-}
 
 function formatBytes(bytes?: number, decimals = 2) {
   if (!bytes) return '0 Bytes';
@@ -103,6 +94,44 @@ function getVersionCount(doc: DocumentWithImage) {
   return Math.max(doc.currentVersion || 0, doc.versions?.length || 0, apiCount, 1);
 }
 
+const DOCUMENTS_PER_PAGE = 9;
+
+type PaginationState = Pagination;
+
+const initialPagination: PaginationState = {
+  page: 1,
+  limit: DOCUMENTS_PER_PAGE,
+  total: 0,
+  totalPages: 1,
+};
+
+function normalizePagination(payload: unknown, fallbackCount: number, fallbackPage: number): PaginationState {
+  const raw = payload as Partial<Pagination> | undefined;
+  const limit = Number(raw?.limit || DOCUMENTS_PER_PAGE);
+  const total = Number(raw?.total ?? fallbackCount);
+  const totalPages = Math.max(1, Number(raw?.totalPages || Math.ceil(total / limit) || 1));
+  const page = Math.min(Math.max(1, Number(raw?.page || fallbackPage)), totalPages);
+
+  return { page, limit, total, totalPages };
+}
+
+function getPageItems(currentPage: number, totalPages: number): Array<number | 'start-ellipsis' | 'end-ellipsis'> {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  const items: Array<number | 'start-ellipsis' | 'end-ellipsis'> = [1];
+  const start = Math.max(2, currentPage - 1);
+  const end = Math.min(totalPages - 1, currentPage + 1);
+
+  if (start > 2) items.push('start-ellipsis');
+  for (let page = start; page <= end; page += 1) items.push(page);
+  if (end < totalPages - 1) items.push('end-ellipsis');
+  items.push(totalPages);
+
+  return items;
+}
+
 const glowCard =
   "border-sky-500/10 dark:border-sky-400/10 bg-white dark:bg-slate-900 " +
   "shadow-[0_0_0_1px_rgba(56,189,248,0.06),0_8px_30px_-8px_rgba(56,189,248,0.35)] " +
@@ -117,6 +146,8 @@ export function DocumentsPage() {
   const [subjects, setSubjects] = useState<SubjectItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState<PaginationState>(initialPagination);
 
   // Filter states
   const [search, setSearch] = useState('');
@@ -145,6 +176,10 @@ export function DocumentsPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, selectedCategory, selectedSubject]);
+
   const loadOptions = useCallback(async () => {
     try {
       const [categoryData, subjectData] = await Promise.all([
@@ -164,15 +199,13 @@ export function DocumentsPage() {
     setLoading(true);
     setError(null);
     try {
-      const currentUserId = getCurrentUserId();
-      const result = await getDocuments({
+      const result = await getMyDocuments({
+        page: currentPage,
+        limit: DOCUMENTS_PER_PAGE,
         search: debouncedSearch.trim() || undefined,
         categoryId: selectedCategory !== 'All' ? selectedCategory : undefined,
         // Gửi subjectId (UUID) để backend lọc chính xác
         subjectId: selectedSubject !== 'All' ? selectedSubject : undefined,
-        // Chỉ lấy tài liệu của chính người dùng đang đăng nhập
-        uploadedBy: currentUserId || undefined,
-        limit: 50,
         sortBy: 'createdAt',
         sortOrder: 'desc',
       });
@@ -181,24 +214,23 @@ export function DocumentsPage() {
       const documentList = Array.isArray(rawDocuments)
         ? rawDocuments
         : extractArray<DocumentWithImage>(rawDocuments, 'documents');
+      const nextPagination = normalizePagination(result.pagination, documentList.length, currentPage);
 
-      // Lọc thêm ở phía client để đảm bảo chắc chắn không hiện tài liệu của người khác
-      // dù backend có hỗ trợ param uploadedBy hay không.
-      const ownDocumentsOnly = currentUserId
-        ? (documentList as DocumentWithImage[]).filter(
-          (doc) => (doc.uploadedBy || doc.user?.id) === currentUserId
-        )
-        : (documentList as DocumentWithImage[]);
+      setDocuments(documentList as DocumentWithImage[]);
+      setPagination(nextPagination);
 
-      setDocuments(ownDocumentsOnly);
+      if (documentList.length === 0 && currentPage > nextPagination.totalPages) {
+        setCurrentPage(nextPagination.totalPages);
+      }
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : 'Lỗi khi tải danh sách tài liệu.');
       setDocuments([]);
+      setPagination(initialPagination);
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, selectedCategory, selectedSubject]);
+  }, [currentPage, debouncedSearch, selectedCategory, selectedSubject]);
 
   useEffect(() => { loadOptions(); }, [loadOptions]);
   useEffect(() => { loadDocuments(); }, [loadDocuments]);
@@ -282,7 +314,11 @@ export function DocumentsPage() {
       toast.success('Tải lên tài liệu thành công!');
       setIsUploadOpen(false);
       resetUploadForm();
-      await loadDocuments();
+      if (currentPage === 1) {
+        await loadDocuments();
+      } else {
+        setCurrentPage(1);
+      }
     } catch (err) {
       console.error(err);
       toast.error(err instanceof Error ? err.message : 'Lỗi khi tải lên tài liệu.');
@@ -296,7 +332,11 @@ export function DocumentsPage() {
     try {
       await deleteDocument(docId);
       toast.success('Đã xóa tài liệu thành công!');
-      setDocuments((prev) => prev.filter((doc) => doc.id !== docId));
+      if (documents.length === 1 && currentPage > 1) {
+        setCurrentPage((page) => page - 1);
+      } else {
+        await loadDocuments();
+      }
     } catch (err) {
       console.error(err);
       toast.error(err instanceof Error ? err.message : 'Lỗi khi xóa tài liệu.');
@@ -407,7 +447,9 @@ export function DocumentsPage() {
 
       <p className="text-xs text-muted-foreground font-semibold">
         {loading ? 'Đang tải danh sách tài liệu...' : (
-          <>Tìm thấy <span className="text-indigo-500">{documents.length}</span> tài liệu của bạn</>
+          <>
+            Tìm thấy <span className="text-indigo-500">{pagination.total}</span> tài liệu của bạn
+          </>
         )}
       </p>
 
@@ -509,6 +551,60 @@ export function DocumentsPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {!loading && documents.length > 0 && pagination.totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 px-4 py-3 shadow-sm">
+          <p className="text-xs font-semibold text-muted-foreground">
+            Đang xem {documents.length} tài liệu trên trang {pagination.page} / {pagination.totalPages}
+          </p>
+
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={pagination.page <= 1}
+              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+              className="rounded-xl border-slate-200 dark:border-slate-800"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Trước
+            </Button>
+
+            {getPageItems(pagination.page, pagination.totalPages).map((item) => (
+              typeof item === 'number' ? (
+                <Button
+                  key={item}
+                  type="button"
+                  variant={item === pagination.page ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setCurrentPage(item)}
+                  className={`min-w-9 rounded-xl ${item === pagination.page
+                    ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                    : 'border-slate-200 dark:border-slate-800'
+                    }`}
+                >
+                  {item}
+                </Button>
+              ) : (
+                <span key={item} className="px-1 text-sm font-bold text-slate-400">...</span>
+              )
+            ))}
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={pagination.page >= pagination.totalPages}
+              onClick={() => setCurrentPage((page) => Math.min(pagination.totalPages, page + 1))}
+              className="rounded-xl border-slate-200 dark:border-slate-800"
+            >
+              Sau
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       )}
 

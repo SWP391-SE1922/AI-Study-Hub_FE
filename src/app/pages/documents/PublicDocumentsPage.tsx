@@ -15,6 +15,9 @@ interface CategoryGroup {
     subjects: Record<string, SubjectGroup>;
 }
 
+const PUBLIC_DOCUMENTS_PAGE_SIZE = 50;
+const SUBJECT_DOCUMENTS_PAGE_SIZE = 8;
+
 export function PublicDocumentsPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -26,6 +29,7 @@ export function PublicDocumentsPage() {
 
     // Lưu mã môn học đang được chọn để hiển thị danh sách file ngay phía dưới
     const [selectedSubjectCode, setSelectedSubjectCode] = useState<string | null>(null);
+    const [subjectPages, setSubjectPages] = useState<Record<string, number>>({});
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -35,15 +39,39 @@ export function PublicDocumentsPage() {
     }, [searchQuery]);
 
     useEffect(() => {
+        setSelectedSubjectCode(null);
+        setSubjectPages({});
+    }, [debouncedSearch]);
+
+    useEffect(() => {
         const fetchDocs = async () => {
             try {
                 setLoading(true);
-                // Gọi API với tham số isPublic được xử lý qua hàm getPublicDocuments chung
-                const result = await getPublicDocuments({ search: debouncedSearch });
-                // Lọc lại lần nữa ở frontend: chỉ giữ tài liệu isPublic === true.
-                // Đảm bảo tài liệu vừa bị chuyển sang "Riêng tư" không còn hiện ở đây,
-                // kể cả khi backend chưa lọc chuẩn hoặc dữ liệu có độ trễ cache.
-                const onlyPublic = (result.documents || []).filter((doc) => doc.isPublic !== false);
+                // Lấy đủ tất cả trang tài liệu công khai để tổng số ở User khớp với số công khai bên Admin.
+                const firstResult = await getPublicDocuments({
+                    page: 1,
+                    limit: PUBLIC_DOCUMENTS_PAGE_SIZE,
+                    search: debouncedSearch.trim() || undefined,
+                    sortBy: 'createdAt',
+                    sortOrder: 'desc',
+                });
+
+                const allDocuments = [...(firstResult.documents || [])];
+                const totalPages = Math.max(1, Number(firstResult.pagination?.totalPages || 1));
+
+                for (let page = 2; page <= totalPages; page += 1) {
+                    const nextResult = await getPublicDocuments({
+                        page,
+                        limit: PUBLIC_DOCUMENTS_PAGE_SIZE,
+                        search: debouncedSearch.trim() || undefined,
+                        sortBy: 'createdAt',
+                        sortOrder: 'desc',
+                    });
+                    allDocuments.push(...(nextResult.documents || []));
+                }
+
+                // Lọc lại lần nữa ở frontend để tài liệu riêng tư không xuất hiện nếu backend cũ chưa lọc chuẩn.
+                const onlyPublic = allDocuments.filter((doc) => doc.isPublic !== false);
                 setDocuments(onlyPublic);
             } catch (error: any) {
                 console.error(error);
@@ -115,7 +143,18 @@ export function PublicDocumentsPage() {
 
     const handleSubjectClick = (subjectCode: string) => {
         // Nếu bấm lại môn đang chọn thì đóng xuống, ngược lại thì mở môn mới
-        setSelectedSubjectCode(prev => (prev === subjectCode ? null : subjectCode));
+        setSelectedSubjectCode(prev => {
+            const nextSubjectCode = prev === subjectCode ? null : subjectCode;
+            if (nextSubjectCode) {
+                setSubjectPages(pages => ({ ...pages, [nextSubjectCode]: pages[nextSubjectCode] || 1 }));
+            }
+            return nextSubjectCode;
+        });
+    };
+
+    const changeSubjectPage = (subjectCode: string, page: number, totalPages: number) => {
+        const safePage = Math.min(Math.max(page, 1), totalPages);
+        setSubjectPages(prev => ({ ...prev, [subjectCode]: safePage }));
     };
 
     const handleDownload = async (doc: DocumentItem) => {
@@ -221,55 +260,105 @@ export function PublicDocumentsPage() {
                                             })}
                                         </div>
 
-                                        {/* Vùng hiển thị TẤT CẢ file thuộc môn được chọn (chỉ hiện nếu môn đó nằm trong Danh mục này) */}
-                                        {Object.values(categoryGroup.subjects).some(sub => sub.code === selectedSubjectCode) && (
-                                            <div className="bg-slate-50 dark:bg-[#0F0A24]/80 border border-indigo-400/25 rounded-xl p-4 space-y-1 shadow-[0_0_22px_-6px_rgba(99,102,241,0.4)] animate-in fade-in slide-in-from-top-2 duration-200">
-                                                <div className="flex items-center gap-2 text-xs font-bold text-indigo-500 dark:text-indigo-300 mb-2 px-1 pb-2 border-b border-indigo-400/15">
-                                                    <FileText className="w-3.5 h-3.5" />
-                                                    {selectedSubjectCode} — {categoryGroup.subjects[selectedSubjectCode!]?.name}
-                                                </div>
+                                        {/* Vùng hiển thị file thuộc môn được chọn, chia 8 tài liệu mỗi trang */}
+                                        {Object.values(categoryGroup.subjects).some(sub => sub.code === selectedSubjectCode) && (() => {
+                                            const selectedSubject = categoryGroup.subjects[selectedSubjectCode!];
+                                            const selectedDocuments = selectedSubject?.documents || [];
+                                            const totalPages = Math.max(1, Math.ceil(selectedDocuments.length / SUBJECT_DOCUMENTS_PAGE_SIZE));
+                                            const currentPage = Math.min(subjectPages[selectedSubjectCode!] || 1, totalPages);
+                                            const startIndex = (currentPage - 1) * SUBJECT_DOCUMENTS_PAGE_SIZE;
+                                            const visibleDocuments = selectedDocuments.slice(startIndex, startIndex + SUBJECT_DOCUMENTS_PAGE_SIZE);
 
-                                                <div className="divide-y divide-slate-200 dark:divide-white/5">
-                                                    {categoryGroup.subjects[selectedSubjectCode!]?.documents.map((doc) => (
-                                                        <div
-                                                            key={doc.id}
-                                                            className="flex flex-col sm:flex-row sm:items-center justify-between py-3 px-2 rounded-lg hover:bg-indigo-500/5 dark:hover:bg-white/5 transition-colors gap-3 group"
-                                                        >
-                                                            <div className="flex items-start gap-3 min-w-0">
-                                                                <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-500/10 shrink-0 group-hover:bg-indigo-500/20 transition-colors">
-                                                                    <FileText className="w-4 h-4 text-indigo-400" />
-                                                                </span>
-                                                                <div className="min-w-0">
-                                                                    <div className="text-sm font-semibold text-foreground truncate max-w-xl" title={doc.title}>
-                                                                        {doc.title}
-                                                                    </div>
-                                                                    <div className="text-[11px] text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 mt-0.5">
-                                                                        <span>Đăng bởi: <span className="text-slate-600 dark:text-slate-300 font-medium">{doc.user?.fullName || 'Thành viên'}</span></span>
-                                                                        <span>Cập nhật: {new Date(doc.createdAt).toLocaleDateString('vi-VN')}</span>
+                                            return (
+                                                <div className="bg-slate-50 dark:bg-[#0F0A24]/80 border border-indigo-400/25 rounded-xl p-4 space-y-1 shadow-[0_0_22px_-6px_rgba(99,102,241,0.4)] animate-in fade-in slide-in-from-top-2 duration-200">
+                                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-bold text-indigo-500 dark:text-indigo-300 mb-2 px-1 pb-2 border-b border-indigo-400/15">
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <FileText className="w-3.5 h-3.5 shrink-0" />
+                                                            <span className="truncate">{selectedSubjectCode} — {selectedSubject?.name}</span>
+                                                        </div>
+                                                        <span className="text-[11px] font-semibold text-muted-foreground">
+                                                            Hiển thị {selectedDocuments.length === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + SUBJECT_DOCUMENTS_PAGE_SIZE, selectedDocuments.length)} / {selectedDocuments.length} tài liệu
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="divide-y divide-slate-200 dark:divide-white/5">
+                                                        {visibleDocuments.map((doc) => (
+                                                            <div
+                                                                key={doc.id}
+                                                                className="flex flex-col sm:flex-row sm:items-center justify-between py-3 px-2 rounded-lg hover:bg-indigo-500/5 dark:hover:bg-white/5 transition-colors gap-3 group"
+                                                            >
+                                                                <div className="flex items-start gap-3 min-w-0">
+                                                                    <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-500/10 shrink-0 group-hover:bg-indigo-500/20 transition-colors">
+                                                                        <FileText className="w-4 h-4 text-indigo-400" />
+                                                                    </span>
+                                                                    <div className="min-w-0">
+                                                                        <div className="text-sm font-semibold text-foreground truncate max-w-xl" title={doc.title}>
+                                                                            {doc.title}
+                                                                        </div>
+                                                                        <div className="text-[11px] text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 mt-0.5">
+                                                                            <span>Đăng bởi: <span className="text-slate-600 dark:text-slate-300 font-medium">{doc.user?.fullName || 'Thành viên'}</span></span>
+                                                                            <span>Cập nhật: {new Date(doc.createdAt).toLocaleDateString('vi-VN')}</span>
+                                                                        </div>
                                                                     </div>
                                                                 </div>
-                                                            </div>
 
-                                                            {/* Các nút hành động thao tác file nhanh */}
-                                                            <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                                                                {/* Các nút hành động thao tác file nhanh */}
+                                                                <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                                                                    <button
+                                                                        onClick={() => handleDownload(doc)}
+                                                                        className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold rounded-lg bg-slate-200/70 dark:bg-white/5 hover:bg-slate-300 dark:hover:bg-white/10 text-foreground transition-colors"
+                                                                    >
+                                                                        <Download className="w-3 h-3" /> Tải về
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => openDocumentPreview(doc)}
+                                                                        className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_0_12px_-2px_rgba(99,102,241,0.7)] hover:shadow-[0_0_16px_-1px_rgba(99,102,241,0.9)] transition-shadow"
+                                                                    >
+                                                                        <Eye className="w-3 h-3" /> Xem trước
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+
+                                                    {totalPages > 1 && (
+                                                        <div className="flex justify-end gap-3 pt-3 px-1">
+                                                            <div className="flex flex-wrap items-center gap-1.5">
                                                                 <button
-                                                                    onClick={() => handleDownload(doc)}
-                                                                    className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold rounded-lg bg-slate-200/70 dark:bg-white/5 hover:bg-slate-300 dark:hover:bg-white/10 text-foreground transition-colors"
+                                                                    type="button"
+                                                                    disabled={currentPage === 1}
+                                                                    onClick={() => changeSubjectPage(selectedSubjectCode!, currentPage - 1, totalPages)}
+                                                                    className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-white/10 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-indigo-500/10 transition-colors"
                                                                 >
-                                                                    <Download className="w-3 h-3" /> Tải về
+                                                                    Trước
                                                                 </button>
+                                                                {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => (
+                                                                    <button
+                                                                        key={pageNumber}
+                                                                        type="button"
+                                                                        onClick={() => changeSubjectPage(selectedSubjectCode!, pageNumber, totalPages)}
+                                                                        className={`min-w-8 px-2.5 py-1.5 text-xs font-bold rounded-lg border transition-colors ${pageNumber === currentPage
+                                                                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-[0_0_12px_-4px_rgba(99,102,241,0.8)]'
+                                                                            : 'border-slate-200 dark:border-white/10 hover:bg-indigo-500/10'
+                                                                            }`}
+                                                                    >
+                                                                        {pageNumber}
+                                                                    </button>
+                                                                ))}
                                                                 <button
-                                                                    onClick={() => openDocumentPreview(doc)}
-                                                                    className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_0_12px_-2px_rgba(99,102,241,0.7)] hover:shadow-[0_0_16px_-1px_rgba(99,102,241,0.9)] transition-shadow"
+                                                                    type="button"
+                                                                    disabled={currentPage === totalPages}
+                                                                    onClick={() => changeSubjectPage(selectedSubjectCode!, currentPage + 1, totalPages)}
+                                                                    className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-white/10 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-indigo-500/10 transition-colors"
                                                                 >
-                                                                    <Eye className="w-3 h-3" /> Xem trước
+                                                                    Sau
                                                                 </button>
                                                             </div>
                                                         </div>
-                                                    ))}
+                                                    )}
                                                 </div>
-                                            </div>
-                                        )}
+                                            );
+                                        })()}
                                     </div>
                                 )}
                             </div>

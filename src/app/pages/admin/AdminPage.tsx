@@ -12,9 +12,9 @@ import {
   FolderOpen,
   HardDrive,
   History,
-
+  MessageSquare,
   RefreshCw,
-  Edit,
+  Pencil,
   Shield,
   Trash2,
   TrendingUp,
@@ -33,7 +33,7 @@ import {
   deleteDocument,
   deleteUser,
   getCategories,
-
+  getChatSessions,
   getDocuments,
   getDocumentVersions,
   getMe,
@@ -80,6 +80,36 @@ function getDateKey(value?: string) {
   const date = value ? new Date(value) : new Date();
   if (Number.isNaN(date.getTime())) return '';
   return date.toISOString().slice(0, 10);
+}
+
+function getDocumentClassification(doc: DocumentItem) {
+  return doc.category?.name || doc.subjectRef?.name || doc.subject || 'Chưa phân loại';
+}
+
+const ADMIN_DOCUMENT_FETCH_LIMIT = 50;
+
+async function fetchAllAdminDocuments() {
+  const firstResult = await getDocuments({
+    page: 1,
+    limit: ADMIN_DOCUMENT_FETCH_LIMIT,
+    sortBy: 'createdAt',
+    sortOrder: 'desc',
+  });
+
+  const allDocuments = [...(firstResult.documents || [])];
+  const totalPages = Math.max(1, Number(firstResult.pagination?.totalPages || 1));
+
+  for (let page = 2; page <= totalPages; page += 1) {
+    const nextResult = await getDocuments({
+      page,
+      limit: ADMIN_DOCUMENT_FETCH_LIMIT,
+      sortBy: 'createdAt',
+      sortOrder: 'desc',
+    });
+    allDocuments.push(...(nextResult.documents || []));
+  }
+
+  return allDocuments;
 }
 
 // Glow shadow dùng chung cho các card — ánh sáng xanh dương (sky/cyan), đồng bộ với Dashboard người dùng.
@@ -212,6 +242,7 @@ export function AdminPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
+  const [chatCount, setChatCount] = useState(0);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -227,17 +258,13 @@ export function AdminPage() {
   const [userToDate, setUserToDate] = useState('');
   const [userPage, setUserPage] = useState(1);
   const [docPage, setDocPage] = useState(1);
-  const [recentPage, setRecentPage] = useState(1);
-  const [topPage, setTopPage] = useState(1);
   const [docSearch, setDocSearch] = useState('');
-  const [docTypeFilter, setDocTypeFilter] = useState('');
+  const [docCategoryFilter, setDocCategoryFilter] = useState('');
   const [docMaxSize, setDocMaxSize] = useState(100);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const USER_PAGE_SIZE = 10;
   const DOC_PAGE_SIZE = 10;
-  const RECENT_DOCS_PAGE_SIZE = 5;
-  const TOP_DOCS_PAGE_SIZE = 5;
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -245,6 +272,8 @@ const pageMode = location.pathname.includes('/admin/users')
   ? 'users'
   : location.pathname.includes('/admin/documents')
     ? 'documents'
+    : location.pathname.includes('/admin/aichat')
+      ? 'aichat'
       : 'dashboard';
 
   const loadAdminData = async () => {
@@ -253,6 +282,7 @@ const pageMode = location.pathname.includes('/admin/users')
     // Không dùng Promise.all cứng để tránh 1 API lỗi làm hỏng toàn bộ trang admin.
     const nextUsers: User[] = [];
     let nextDocuments: DocumentItem[] = [];
+    let nextChatCount = 0;
     let nextCategories: CategoryItem[] = [];
     let nextCurrentUser: User | null = null;
 
@@ -264,8 +294,7 @@ const pageMode = location.pathname.includes('/admin/users')
     }
 
     try {
-      const docResult = await getDocuments({ page: 1, limit: 50, sortBy: 'createdAt', sortOrder: 'desc' });
-      nextDocuments = docResult.documents || [];
+      nextDocuments = await fetchAllAdminDocuments();
     } catch (error) {
       toast.error(error instanceof Error ? `Không tải được tài liệu: ${error.message}` : 'Không tải được tài liệu');
     }
@@ -277,6 +306,13 @@ const pageMode = location.pathname.includes('/admin/users')
     }
 
     try {
+      const chatSessions = await getChatSessions();
+      nextChatCount = chatSessions.length || 0;
+    } catch {
+      nextChatCount = 0;
+    }
+
+    try {
       nextCurrentUser = await getMe();
     } catch {
       nextCurrentUser = null;
@@ -285,10 +321,11 @@ const pageMode = location.pathname.includes('/admin/users')
     setUsers(nextUsers);
     setDocuments(nextDocuments);
     setCategories(nextCategories);
+    setChatCount(nextChatCount);
     setCurrentUser(nextCurrentUser);
     if (pageMode === "documents") {
     setDocSearch("");
-    setDocTypeFilter("");
+    setDocCategoryFilter("");
     setFromDate("");
     setToDate("");
     setDocMaxSize(100);
@@ -315,7 +352,7 @@ const pageMode = location.pathname.includes('/admin/users')
 
   const stats = [
     { title: 'Tổng người dùng', value: String(users.length), change: `${verifiedUsers} đã xác thực`, icon: Users, color: 'text-sky-500', iconBg: 'bg-sky-50 dark:bg-sky-500/10' },
-    { title: 'Tổng tài liệu', value: String(documents.length), change: `${publicDocuments} công khai`, icon: FileText, color: 'text-indigo-500', iconBg: 'bg-indigo-50 dark:bg-indigo-500/10' },
+    { title: 'Tổng tài liệu hệ thống', value: String(documents.length), change: `Tài liệu cộng đồng: ${publicDocuments}`, icon: FileText, color: 'text-indigo-500', iconBg: 'bg-indigo-50 dark:bg-indigo-500/10' },
     { title: 'Tổng lượt tải', value: String(totalDownloads), change: 'Từ API documents', icon: TrendingUp, color: 'text-emerald-500', iconBg: 'bg-emerald-50 dark:bg-emerald-500/10' },
     { title: 'Dung lượng đã dùng', value: formatFileSize(storageUsed), change: 'Toàn hệ thống', icon: HardDrive, color: 'text-fuchsia-500', iconBg: 'bg-fuchsia-50 dark:bg-fuchsia-500/10' },
   ];
@@ -324,7 +361,7 @@ const pageMode = location.pathname.includes('/admin/users')
     const map = new Map<string, { name: string; count: number; storage: number; downloads: number }>();
 
     documents.forEach((doc) => {
-      const name = doc.category?.name || doc.subjectRef?.name || doc.subject || 'Chưa phân loại';
+      const name = getDocumentClassification(doc);
       const current = map.get(name) || { name, count: 0, storage: 0, downloads: 0 };
       current.count += 1;
       current.storage += Number(doc.fileSize || 0);
@@ -390,37 +427,7 @@ const pageMode = location.pathname.includes('/admin/users')
     [uploadTimeline],
   );
 
-  const sortedRecentDocuments = useMemo(
-    () =>
-      [...documents]
-        .sort((a, b) => (new Date(b.createdAt).getTime() || 0) - (new Date(a.createdAt).getTime() || 0)),
-    [documents],
-  );
-
-  const totalRecentPages = Math.max(1, Math.ceil(sortedRecentDocuments.length / RECENT_DOCS_PAGE_SIZE));
-  const paginatedRecentDocuments = useMemo(
-    () =>
-      sortedRecentDocuments.slice((recentPage - 1) * RECENT_DOCS_PAGE_SIZE, recentPage * RECENT_DOCS_PAGE_SIZE),
-    [sortedRecentDocuments, recentPage],
-  );
-
-  const sortedTopDocuments = useMemo(
-    () =>
-      [...documents].sort(
-        (a, b) =>
-          (Number(b.downloadCount || 0) - Number(a.downloadCount || 0)) ||
-          ((new Date(b.createdAt).getTime() || 0) - (new Date(a.createdAt).getTime() || 0)),
-      ),
-    [documents],
-  );
-
-  const totalTopPages = Math.max(1, Math.ceil(sortedTopDocuments.length / TOP_DOCS_PAGE_SIZE));
-  const paginatedTopDocuments = useMemo(
-    () =>
-      sortedTopDocuments.slice((topPage - 1) * TOP_DOCS_PAGE_SIZE, topPage * TOP_DOCS_PAGE_SIZE),
-    [sortedTopDocuments, topPage],
-  );
-
+  const recentDocuments = useMemo(() => documents.slice(0, 5), [documents]);
   const filteredUsers = useMemo(() => {
     return users.filter((user) => {
       const name = (user.fullName || '').toLowerCase();
@@ -446,25 +453,19 @@ const pageMode = location.pathname.includes('/admin/users')
   const filteredDocuments = useMemo(() => {
     return documents.filter((doc) => {
       const name = doc.title?.toLowerCase() || '';
-      const classification = (doc.category?.name || doc.subjectRef?.name || doc.subject || '').toLowerCase();
+      const classification = getDocumentClassification(doc).toLowerCase();
       const size = Number(doc.fileSize || 0) / (1024 * 1024);
       const matchSearch = !docSearch || name.includes(docSearch.toLowerCase());
-      const matchType = !docTypeFilter || classification === docTypeFilter.toLowerCase();
+      const matchCategory = !docCategoryFilter || classification === docCategoryFilter.toLowerCase();
       const matchSize = size <= docMaxSize;
       const created = doc.createdAt ? new Date(doc.createdAt).getTime() : 0;
 
       const matchFrom = !fromDate || created >= new Date(fromDate).getTime();
       const matchTo = !toDate || created <= new Date(toDate).getTime();
 
-      return (
-        matchSearch &&
-        matchType &&
-        matchSize &&
-        matchFrom &&
-        matchTo
-      );
+      return matchSearch && matchCategory && matchSize && matchFrom && matchTo;
     });
-  }, [documents, docSearch, docTypeFilter, docMaxSize, fromDate, toDate]);
+  }, [documents, docSearch, docCategoryFilter, docMaxSize, fromDate, toDate]);
 
   const totalDocPages = Math.max(1, Math.ceil(filteredDocuments.length / DOC_PAGE_SIZE));
   const paginatedDocuments = useMemo(
@@ -472,15 +473,19 @@ const pageMode = location.pathname.includes('/admin/users')
     [filteredDocuments, docPage],
   );
 
-  const docTypes = useMemo(() => {
-    const types = new Set<string>();
-    documents.forEach((doc) => {
-      const classification = doc.category?.name || doc.subjectRef?.name || doc.subject;
-      if (classification) types.add(classification);
-      else types.add('Chưa phân loại');
+  const docCategoryOptions = useMemo(() => {
+    const names = new Set<string>();
+
+    categories.forEach((category) => {
+      if (category.name) names.add(category.name);
     });
-    return Array.from(types).sort((a, b) => a.localeCompare(b, 'vi'));
-  }, [documents]);
+
+    documents.forEach((doc) => {
+      names.add(getDocumentClassification(doc));
+    });
+
+    return Array.from(names).sort((a, b) => a.localeCompare(b, 'vi'));
+  }, [categories, documents]);
   const topDocuments = useMemo(
     () => [...documents].sort((a, b) => Number(b.downloadCount || 0) - Number(a.downloadCount || 0)).slice(0, 5),
     [documents],
@@ -589,7 +594,13 @@ const pageMode = location.pathname.includes('/admin/users')
       };
     }
 
-   
+    if (pageMode === 'aichat') {
+      return {
+        icon: MessageSquare,
+        title: 'AI Chat Admin',
+        description: 'Theo dõi trạng thái sử dụng tính năng AI Chat trong hệ thống.',
+      };
+    }
 
     return {
       icon: Shield,
@@ -702,56 +713,21 @@ const pageMode = location.pathname.includes('/admin/users')
                   <CardDescription>5 tài liệu vừa được tải lên hệ thống.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {paginatedRecentDocuments.map((doc) => (
+                  {recentDocuments.map((doc) => (
                     <div key={doc.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/20 p-3 hover:shadow-[0_0_20px_-10px_rgba(56,189,248,0.6)] transition-shadow">
                       <div className="min-w-0">
                         <p className="font-medium truncate">{doc.title}</p>
                         <p className="text-xs text-muted-foreground">
-                          {doc.category?.name || doc.subjectRef?.name || doc.subject || 'Chưa phân loại'} · {formatDate(doc.createdAt)}
+                          {getDocumentClassification(doc)} · {formatDate(doc.createdAt)}
                         </p>
                       </div>
                       <Badge variant="secondary" className="shrink-0">{formatFileSize(doc.fileSize)}</Badge>
                     </div>
                   ))}
-                  {!paginatedRecentDocuments.length && (
+                  {!recentDocuments.length && (
                     <p className="text-center text-muted-foreground py-8">{loading ? 'Đang tải...' : 'Chưa có tài liệu.'}</p>
                   )}
                 </CardContent>
-                {sortedRecentDocuments.length > 0 && (
-                  <div className="flex items-center justify-center mt-4 px-1">
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 w-8 p-0"
-                        disabled={recentPage === 1}
-                        onClick={() => setRecentPage((p) => Math.max(1, p - 1))}
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                      </Button>
-                      {Array.from({ length: totalRecentPages }, (_, i) => i + 1).map((page) => (
-                        <Button
-                          key={page}
-                          variant={page === recentPage ? 'default' : 'outline'}
-                          size="sm"
-                          className="h-8 w-8 p-0 text-xs"
-                          onClick={() => setRecentPage(page)}
-                        >
-                          {page}
-                        </Button>
-                      ))}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 w-8 p-0"
-                        disabled={recentPage === totalRecentPages}
-                        onClick={() => setRecentPage((p) => Math.min(totalRecentPages, p + 1))}
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
               </Card>
 
               <Card className={glowCard}>
@@ -765,11 +741,11 @@ const pageMode = location.pathname.includes('/admin/users')
                   <CardDescription>Top tài liệu có lượt tải cao nhất.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {paginatedTopDocuments.map((doc, index) => (
+                  {topDocuments.map((doc, index) => (
                     <div key={doc.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/20 p-3 hover:shadow-[0_0_20px_-10px_rgba(56,189,248,0.6)] transition-shadow">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="w-8 h-8 rounded-lg bg-sky-50 dark:bg-sky-500/10 text-sky-500 flex items-center justify-center text-sm font-bold">
-                          {(topPage - 1) * TOP_DOCS_PAGE_SIZE + index + 1}
+                          {index + 1}
                         </div>
                         <div className="min-w-0">
                           <p className="font-medium truncate">{doc.title}</p>
@@ -779,45 +755,10 @@ const pageMode = location.pathname.includes('/admin/users')
                       <Badge className="shrink-0">{doc.downloadCount || 0} lượt tải</Badge>
                     </div>
                   ))}
-                  {!paginatedTopDocuments.length && (
+                  {!topDocuments.length && (
                     <p className="text-center text-muted-foreground py-8">{loading ? 'Đang tải...' : 'Chưa có tài liệu.'}</p>
                   )}
                 </CardContent>
-                {sortedTopDocuments.length > 0 && (
-                  <div className="flex items-center justify-center mt-4 px-1">
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 w-8 p-0"
-                        disabled={topPage === 1}
-                        onClick={() => setTopPage((p) => Math.max(1, p - 1))}
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                      </Button>
-                      {Array.from({ length: totalTopPages }, (_, i) => i + 1).map((page) => (
-                        <Button
-                          key={page}
-                          variant={page === topPage ? 'default' : 'outline'}
-                          size="sm"
-                          className="h-8 w-8 p-0 text-xs"
-                          onClick={() => setTopPage(page)}
-                        >
-                          {page}
-                        </Button>
-                      ))}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 w-8 p-0"
-                        disabled={topPage === totalTopPages}
-                        onClick={() => setTopPage((p) => Math.min(totalTopPages, p + 1))}
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
               </Card>
             </div>
           </div>
@@ -826,11 +767,11 @@ const pageMode = location.pathname.includes('/admin/users')
       {pageMode === 'users' && (
         <div className="space-y-6">
         <Card className={glowCard}>
-          <CardContent className="p-4 md:p-6">
+          <CardContent>
             {/* Filter bar */}
-    <div className="space-y-4">
+    <div className="space-y-3 mb-4">
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
-        <div className="space-y-2 xl:col-span-1">
+        <div className="space-y-1 xl:col-span-1">
           <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tìm kiếm</label>
           <input
             type="text"
@@ -838,16 +779,16 @@ const pageMode = location.pathname.includes('/admin/users')
             value={userSearch}
             onChange={(e) => { setUserSearch(e.target.value); setUserPage(1); }}
             aria-label="Tìm kiếm theo tên hoặc email"
-            className="w-full h-11 rounded-xl border border-input bg-background px-4 text-sm outline-none focus:ring-2 focus:ring-sky-400/40"
+            className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-sky-400/40"
           />
         </div>
-        <div className="space-y-2">
+        <div className="space-y-1">
           <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vai trò</label>
           <select
             value={userRoleFilter}
             onChange={(e) => { setUserRoleFilter(e.target.value); setUserPage(1); }}
             aria-label="Lọc theo vai trò"
-            className="w-full h-11 rounded-xl border border-input bg-background px-4 text-sm"
+            className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
           >
             <option value="">Tất cả vai trò</option>
             <option value="USER">USER</option>
@@ -855,37 +796,37 @@ const pageMode = location.pathname.includes('/admin/users')
             <option value="GUEST">GUEST</option>
           </select>
         </div>
-        <div className="space-y-2">
+        <div className="space-y-1">
           <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trạng thái xác thực</label>
           <select
             value={userVerifiedFilter}
             onChange={(e) => { setUserVerifiedFilter(e.target.value); setUserPage(1); }}
             aria-label="Lọc theo trạng thái xác thực"
-            className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm"
+            className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
           >
             <option value="">Tất cả trạng thái</option>
             <option value="verified">Đã xác thực</option>
             <option value="unverified">Chưa xác thực</option>
           </select>
         </div>
-        <div className="space-y-2">
+        <div className="space-y-1">
           <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Từ ngày</label>
           <input
             type="date"
             value={userFromDate}
             onChange={(e) => { setUserFromDate(e.target.value); setUserPage(1); }}
             aria-label="Lọc từ ngày tạo"
-            className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm"
+            className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
           />
         </div>
-        <div className="space-y-2">
+        <div className="space-y-1">
           <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Đến ngày</label>
           <input
             type="date"
             value={userToDate}
             onChange={(e) => { setUserToDate(e.target.value); setUserPage(1); }}
             aria-label="Lọc đến ngày tạo"
-            className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm"
+            className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
           />
         </div>
       </div>
@@ -898,7 +839,7 @@ const pageMode = location.pathname.includes('/admin/users')
             type="button"
             variant="ghost"
             size="sm"
-            className="h-8 text-xs text-sky-600 hover:text-sky-600"
+            className="h-7 text-xs text-sky-600 hover:text-sky-600"
             onClick={() => {
               setUserSearch('');
               setUserRoleFilter('');
@@ -916,24 +857,24 @@ const pageMode = location.pathname.includes('/admin/users')
      </CardContent>
      </Card>
               <Card className={glowCard}>
-      <CardContent className="p-4 md:p-6">
+      <CardContent>
               <div className="overflow-x-auto">
                 <Table>
-                  <TableHeader className="bg-muted/40 border-b border-border">
+                  <TableHeader>
                     <TableRow>
-                      <TableHead className="py-4 px-6">Người dùng</TableHead>
-                      <TableHead className="py-4 px-4">Email</TableHead>
-                      <TableHead className="py-4 px-4">Vai trò</TableHead>
-                      <TableHead className="py-4 px-4">Xác thực</TableHead>
-                      <TableHead className="py-4 px-4">Dung lượng</TableHead>
-                      <TableHead className="py-4 px-4">Ngày tạo</TableHead>
-                      <TableHead className="py-4 px-6 text-right">Thao tác</TableHead>
+                      <TableHead>Người dùng</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Vai trò</TableHead>
+                      <TableHead>Xác thực</TableHead>
+                      <TableHead>Dung lượng</TableHead>
+                      <TableHead>Ngày tạo</TableHead>
+                      <TableHead className="text-right">Thao tác</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {paginatedUsers.map((user) => (
-                      <TableRow key={user.id} className="hover:bg-muted/10 border-b border-border last:border-0 transition-colors">
-                        <TableCell className="py-4 px-6">
+                      <TableRow key={user.id}>
+                        <TableCell>
                           <div className="flex items-center gap-3">
                             <Avatar className="w-8 h-8 ring-2 ring-indigo-500/20">
                               <AvatarFallback className="bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white text-xs">
@@ -943,28 +884,28 @@ const pageMode = location.pathname.includes('/admin/users')
                             <span className="font-medium whitespace-nowrap">{user.fullName || 'Chưa có tên'}</span>
                           </div>
                         </TableCell>
-                        <TableCell className="py-4 px-4 text-muted-foreground">{user.email}</TableCell>
-                        <TableCell className="py-4 px-4">
+                        <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                        <TableCell>
                           <select
                             value={user.role || 'USER'}
                             disabled={actionLoading === user.id}
                             onChange={(e) => handleChangeRole(user, e.target.value)}
                             aria-label={`Vai trò của ${user.fullName || user.email}`}
-                            className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
                           >
                             <option value="USER">USER</option>
                             <option value="ADMIN">ADMIN</option>
                             <option value="GUEST">GUEST</option>
                           </select>
                         </TableCell>
-                        <TableCell className="py-4 px-4">
+                        <TableCell>
                           <Badge variant={user.isVerified ? 'default' : 'secondary'}>
                             {user.isVerified ? 'Đã xác thực' : 'Chưa xác thực'}
                           </Badge>
                         </TableCell>
-                        <TableCell className="py-4 px-4 text-muted-foreground">{formatFileSize(user.usedStorage)}</TableCell>
-                        <TableCell className="py-4 px-4 text-muted-foreground">{formatDate(user.createdAt)}</TableCell>
-                        <TableCell className="py-4 px-6 text-right">
+                        <TableCell className="text-muted-foreground">{formatFileSize(user.usedStorage)}</TableCell>
+                        <TableCell className="text-muted-foreground">{formatDate(user.createdAt)}</TableCell>
+                        <TableCell className="text-right">
                           <Button
                             variant="ghost"
                             size="sm"
@@ -978,7 +919,7 @@ const pageMode = location.pathname.includes('/admin/users')
                         </TableCell>
                       </TableRow>
                     ))}
-                    {paginatedUsers.length === 0 && (
+                    {!users.length && (
                       <TableRow>
                         <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                           {loading ? 'Đang tải người dùng...' : 'Chưa có người dùng.'}
@@ -988,10 +929,10 @@ const pageMode = location.pathname.includes('/admin/users')
                   </TableBody>
                 </Table>
               </div>
-              {filteredUsers.length > 0 && (
+              {users.length > 0 && (
                 <div className="flex items-center justify-between mt-4 px-1">
                   <p className="text-sm text-muted-foreground">
-                    {(userPage - 1) * USER_PAGE_SIZE + 1}–{Math.min(userPage * USER_PAGE_SIZE, filteredUsers.length)}/{filteredUsers.length} người dùng
+                    {(userPage - 1) * USER_PAGE_SIZE + 1}–{Math.min(userPage * USER_PAGE_SIZE, users.length)}/{users.length} người dùng
                   </p>
                   <div className="flex items-center gap-1">
                     <Button
@@ -1017,77 +958,84 @@ const pageMode = location.pathname.includes('/admin/users')
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-8 w-8 p-0"
-                      disabled={userPage === totalUserPages}
-                      onClick={() => setUserPage((p) => Math.min(totalUserPages, p + 1))}
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
-                  </div>
+                    className="h-8 w-8 p-0"
+                    disabled={userPage === totalUserPages}
+                    onClick={() => setUserPage((p) => Math.min(totalUserPages, p + 1))}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
                 </div>
-              )}
-            </CardContent>
+              </div>
+            )}
+          </CardContent>
         </Card>
          </div>
       )}
       {pageMode === 'documents' && (
         <div className="space-y-6">
         <Card className={glowCard}>
-          <CardContent className="p-4 md:p-6">
+          <CardContent>
             {/* Filter bar */}
-            <div className="space-y-4">
+            <div className="space-y-3 mb-4">
                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tên tài liệu</label>
                   <input
                     type="text"
                     placeholder="Tìm theo tên..."
                     value={docSearch}
                     onChange={(e) => { setDocSearch(e.target.value); setDocPage(1); }}
-                    aria-label="Lọc theo tên tài liệu"
-                    className="w-full h-11 rounded-xl border border-input bg-background px-4 text-sm outline-none focus:ring-2 focus:ring-sky-400/40"
+                    aria-label="Tìm theo tên tài liệu"
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-sky-400/40"
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Phân loại</label>
                   <select
-                    value={docTypeFilter}
-                    onChange={(e) => { setDocTypeFilter(e.target.value); setDocPage(1); }}
+                    value={docCategoryFilter}
+                    onChange={(e) => { setDocCategoryFilter(e.target.value); setDocPage(1); }}
                     aria-label="Lọc theo phân loại"
-                    className="w-full h-11 rounded-xl border border-input bg-background px-4 text-sm"
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
                   >
                     <option value="">Tất cả phân loại</option>
-                    {docTypes.map((t) => (
-                      <option key={t} value={t}>{t}</option>
+                    {docCategoryOptions.map((name) => (
+                      <option key={name} value={name}>{name}</option>
                     ))}
                   </select>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Từ ngày</label>
-                  <input
-                    type="date"
-                    value={fromDate}
-                    onChange={(e) => {
-                      setFromDate(e.target.value);
-                      setDocPage(1);
-                    }}
-                    className="w-full h-11 rounded-xl border border-input bg-background px-4 text-sm"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Đến ngày</label>
-                  <input
-                    type="date"
-                    value={toDate}
-                    onChange={(e) => {
-                      setToDate(e.target.value);
-                      setDocPage(1);
-                    }}
-                    className="w-full h-11 rounded-xl border border-input bg-background px-4 text-sm"
-                  />
-                </div>
+                <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Từ ngày
+                </label>
+
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => {
+                    setFromDate(e.target.value);
+                    setDocPage(1);
+                  }}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                />
               </div>
-              <div className="space-y-2">
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Đến ngày
+                </label>
+
+                <input
+                  type="date"
+                  value={toDate}
+                  onChange={(e) => {
+                    setToDate(e.target.value);
+                    setDocPage(1);
+                  }}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                />
+              </div>
+              </div>
+              <div className="space-y-1">
                 <div className="flex justify-between text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   <span>Dung lượng tối đa</span>
                   <span className="text-sky-500">≤ {docMaxSize} MB</span>
@@ -1107,7 +1055,7 @@ const pageMode = location.pathname.includes('/admin/users')
                 </div>
               </div>
               
-        {(docSearch || docTypeFilter || fromDate || toDate || docMaxSize < 100) && (
+        {(docSearch || docCategoryFilter || fromDate || toDate || docMaxSize < 100) && (
                 <div className="flex items-center justify-between mt-3">
                   <p className="text-xs text-muted-foreground">
                     Tìm thấy {filteredDocuments.length} tài liệu phù hợp.
@@ -1119,7 +1067,7 @@ const pageMode = location.pathname.includes('/admin/users')
                     className="h-7 text-xs text-sky-600 hover:text-sky-600"
                     onClick={() => {
                       setDocSearch('');
-                      setDocTypeFilter('');
+                      setDocCategoryFilter('');
                       setFromDate('');
                       setToDate('');
                       setDocMaxSize(100);
@@ -1135,69 +1083,71 @@ const pageMode = location.pathname.includes('/admin/users')
          </Card>
 
           <Card className={glowCard}>
-            <CardContent className="p-4 md:p-6">
+            <CardContent>
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader className="bg-muted/40 border-b border-border">
+                <TableHeader>
                   <TableRow>
-                    <TableHead className="py-4 px-6">Tên tài liệu</TableHead>
-                    <TableHead className="py-4 px-4">Phân loại</TableHead>
-                    <TableHead className="py-4 px-4">Người tải</TableHead>
-                    <TableHead className="py-4 px-4">Dung lượng</TableHead>
-                    <TableHead className="py-4 px-4">Lượt tải</TableHead>
-                    <TableHead className="py-4 px-4">Ngày tải</TableHead>
-                    <TableHead className="py-4 px-6 text-center">Thao tác</TableHead>
+                    <TableHead>Tên tài liệu</TableHead>
+                    <TableHead>Phân loại</TableHead>
+                    <TableHead>Người tải</TableHead>
+                    <TableHead>Dung lượng</TableHead>
+                    <TableHead>Lượt tải</TableHead>
+                    <TableHead>Ngày tải</TableHead>
+                    <TableHead className="text-right">Thao tác</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {paginatedDocuments.map((doc) => (
-                    <TableRow key={doc.id} className="hover:bg-muted/10 border-b border-border last:border-0 transition-colors">
-                      <TableCell className="py-4 px-6 font-medium max-w-[320px] truncate">{doc.title}</TableCell>
-                      <TableCell className="py-4 px-4 text-muted-foreground">{doc.category?.name || doc.subjectRef?.name || doc.subject || 'Chưa phân loại'}</TableCell>
-                      <TableCell className="py-4 px-4 text-muted-foreground">{doc.user?.fullName || doc.uploadedBy || 'Không rõ'}</TableCell>
-                      <TableCell className="py-4 px-4 text-muted-foreground">{formatFileSize(doc.fileSize)}</TableCell>
-                      <TableCell className="py-4 px-4 text-center text-muted-foreground">{doc.downloadCount || 0}</TableCell>
-                      <TableCell className="py-4 px-4 text-muted-foreground">{formatDate(doc.createdAt)}</TableCell>
-                      <TableCell className="py-4 px-6 text-center max-w-[144px] whitespace-nowrap">
-                        <div className="inline-flex items-center justify-center gap-0.5">
+                    <TableRow key={doc.id}>
+                      <TableCell className="font-medium max-w-[320px] truncate">{doc.title}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {getDocumentClassification(doc)}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{doc.user?.fullName || doc.uploadedBy || 'Không rõ'}</TableCell>
+                      <TableCell className="text-muted-foreground">{formatFileSize(doc.fileSize)}</TableCell>
+                      <TableCell className="text-muted-foreground">{doc.downloadCount || 0}</TableCell>
+                      <TableCell className="text-muted-foreground">{formatDate(doc.createdAt)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex flex-col items-end gap-1">
                           <Button
                             variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 rounded-full p-0 text-sky-600 hover:text-sky-700"
+                            size="sm"
+                            className="text-sky-600 hover:text-sky-600 dark:text-sky-400"
                             onClick={() => navigate(`/admin/documents/${doc.id}`)}
-                            aria-label="Xem"
                           >
-                            <FileText className="w-4 h-4" />
+                            <FileText className="w-4 h-4 mr-1" />
+                            Xem
                           </Button>
                           <Button
                             variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 rounded-full p-0 text-amber-600 hover:text-amber-700"
+                            size="sm"
+                            className="text-amber-600 hover:text-amber-600"
                             disabled={editLoading && editingDocument?.id === doc.id}
                             onClick={() => setEditingDocument(doc)}
-                            aria-label="Sửa"
                           >
-                            <Edit className="w-4 h-4" />
+                            <Pencil className="w-4 h-4 mr-1" />
+                            Sửa
                           </Button>
                           <Button
                             variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 rounded-full p-0 text-purple-600 hover:text-purple-700"
+                            size="sm"
+                            className="text-purple-600 hover:text-purple-600"
                             disabled={versionLoading && versionDocument?.id === doc.id}
                             onClick={() => handleViewDocumentVersions(doc)}
-                            aria-label="Version"
                           >
-                            <History className="w-4 h-4" />
+                            <History className="w-4 h-4 mr-1" />
+                            Version
                           </Button>
                           <Button
                             variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 rounded-full p-0 text-destructive hover:text-destructive/80"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
                             disabled={actionLoading === doc.id}
                             onClick={() => handleDeleteDocument(doc)}
-                            aria-label="Xóa"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-4 h-4 mr-1" />
+                            Xóa
                           </Button>
                         </div>
                       </TableCell>
@@ -1241,7 +1191,72 @@ const pageMode = location.pathname.includes('/admin/users')
         </div>
       )}
 
-    
+      {pageMode === 'aichat' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className={glowCard}>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Chat sessions</p>
+                    <h3 className="text-2xl font-bold mt-1">{chatCount}</h3>
+                    <p className="text-xs text-muted-foreground mt-1">Theo dữ liệu API hiện tại</p>
+                  </div>
+                  <div className="w-12 h-12 bg-sky-50 dark:bg-sky-500/10 rounded-xl flex items-center justify-center">
+                    <MessageSquare className="w-6 h-6 text-sky-500" />
+                  </div>
+                </div>
+
+              </CardContent>
+            </Card>
+
+            <Card className={glowCard}>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Người dùng hệ thống</p>
+                    <h3 className="text-2xl font-bold mt-1">{users.length}</h3>
+                    <p className="text-xs text-muted-foreground mt-1">Có thể dùng AI Chat</p>
+                  </div>
+                  <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-500/10 rounded-xl flex items-center justify-center">
+                    <Users className="w-6 h-6 text-indigo-500" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className={glowCard}>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Trạng thái</p>
+                    <h3 className="text-2xl font-bold mt-1">API</h3>
+                    <p className="text-xs text-muted-foreground mt-1">Lấy từ /api/ai/sessions</p>
+                  </div>
+                  <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl flex items-center justify-center">
+                    <Activity className="w-6 h-6 text-emerald-500" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className={glowCard}>
+            <CardHeader>
+              <CardTitle>Ghi chú AI Chat Admin</CardTitle>
+              <CardDescription>
+                Trang này tách riêng khỏi Dashboard và Quản lý User. Nếu backend có API thống kê toàn bộ chat của hệ thống,
+                bạn có thể mở rộng thêm bảng lịch sử chat tại đây.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+                Hiện frontend đang đọc số session qua API AI hiện có. Không dùng giao diện quản lý user cho mục AI Chat nữa.
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
       <DocumentMetadataDialog
         open={Boolean(editingDocument)}
         title="Sửa tài liệu"
