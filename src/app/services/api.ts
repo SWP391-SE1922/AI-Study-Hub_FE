@@ -483,3 +483,22 @@ export async function deleteChatSession(sessionId: string) {
     throw new Error(payload?.message || `Lỗi API ${response.status}`);
   }
 }
+// Thêm vào cuối file api.ts của bạn
+
+export async function getPublicDocuments(params: Record<string, string | number | undefined> = {}) {
+  const searchParams = new URLSearchParams();
+
+  // Tự động đẩy isPublic = true để backend lọc đúng tài liệu công khai
+  searchParams.set('isPublic', 'true');
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== '') {
+      searchParams.set(key, String(value));
+    }
+  });
+
+  const query = searchParams.toString();
+  // Gọi tới endpoint /documents kèm theo query string
+  const result = await request<ApiResponse<DocumentItem[]>>(`/documents${query ? `?${query}` : ''}`);
+  return { documents: result.data, pagination: result.pagination };
+}

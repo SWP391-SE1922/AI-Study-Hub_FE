@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, FileText, MessageSquare, Settings, LogOut, Menu, X, Sun, Moon, Bot, Shield, Sparkles } from 'lucide-react';
+import { LayoutDashboard, FileText, MessageSquare, Settings, LogOut, Menu, X, Sun, Moon, Bot, Shield, Sparkles, Globe } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Button } from '../ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
@@ -63,14 +63,14 @@ export function MainLayout() {
   const menuItems = [
     ...(isAdmin ? [{ path: '/admin', label: 'Admin', icon: Shield }] : []),
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { path: '/documents', label: 'Tài liệu', icon: FileText },
+    { path: '/documents', label: 'Tài liệu của tôi', icon: FileText },
+    { path: '/public-documents', label: 'Tài liệu cộng đồng', icon: Globe }, // Thêm menu xem tài liệu public
     { path: '/chat', label: 'Chat AI', icon: Bot },
     { path: '/profile', label: 'Settings', icon: Settings },
   ];
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#0B0A1A] text-foreground transition-colors duration-300">
-      {/* Local keyframes for the ambient / hover effects below */}
       <style>{`
         @keyframes main-blob-float-1 {
           0%, 100% { transform: translate(0, 0) scale(1); }
@@ -126,7 +126,6 @@ export function MainLayout() {
 
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 h-16 border-b border-slate-200/70 dark:border-white/5 bg-white/80 dark:bg-[#0B0A1A]/80 backdrop-blur-md z-30 flex items-center justify-between px-4 lg:px-7 lg:pl-72 transition-colors duration-300">
-        {/* subtle animated gradient hairline along the very top of the header */}
         <div className="main-header-glow pointer-events-none absolute top-0 left-0 right-0 h-px opacity-70" />
 
         <div className="flex items-center gap-3">
@@ -183,7 +182,6 @@ export function MainLayout() {
         shadow-2xl shadow-black/40 overflow-hidden
         ${sidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0 lg:translate-x-0'}`}
       >
-        {/* ambient glow accents, now gently floating */}
         <div className="main-blob-1 pointer-events-none absolute -top-24 -left-16 w-56 h-56 bg-fuchsia-500/20 rounded-full blur-3xl" />
         <div className="main-blob-2 pointer-events-none absolute bottom-24 -right-10 w-48 h-48 bg-indigo-500/20 rounded-full blur-3xl" />
         <div className="pointer-events-none absolute top-1/2 left-1/2 w-72 h-72 -translate-x-1/2 -translate-y-1/2 bg-violet-500/5 rounded-full blur-3xl" />
@@ -223,12 +221,10 @@ export function MainLayout() {
                         : 'text-slate-300 hover:text-white hover:bg-white/5 hover:translate-x-1 hover:shadow-[0_0_18px_-6px_rgba(167,139,250,0.6)]'
                       }`}
                   >
-                    {/* active-state left indicator bar */}
                     <span
                       className={`absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full bg-white/90 transition-all duration-300 ${isActive ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-0'
                         }`}
                     />
-                    {/* moving shimmer highlight on the active pill */}
                     {isActive && <span className="main-active-shimmer absolute inset-0 pointer-events-none" />}
 
                     <Icon className={`w-4 h-4 shrink-0 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110 group-hover:-rotate-6'}`} />
