@@ -178,10 +178,6 @@ export function AdminDocumentDetailPage() {
                 <span>Tên file: {document.fileName}</span>
               </div>
               <div className="flex items-center gap-2 rounded-xl border border-slate-100 dark:border-slate-800 p-3">
-                <FileText className="w-4 h-4 text-slate-400" />
-                <span>Loại file: {document.mimeType}</span>
-              </div>
-              <div className="flex items-center gap-2 rounded-xl border border-slate-100 dark:border-slate-800 p-3">
                 <User className="w-4 h-4 text-slate-400" />
                 <span>Người tải: {document.user?.fullName || 'Không rõ'}</span>
               </div>

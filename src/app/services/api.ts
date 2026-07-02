@@ -5,8 +5,15 @@ type ApiResponse<T> = {
   success: boolean;
   message: string;
   data: T;
-  pagination?: unknown;
+  pagination?: Pagination;
   errors?: unknown;
+};
+
+export type Pagination = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
 };
 
 export type User = {
@@ -29,7 +36,7 @@ export type LoginResponse = {
 
 export type UserListResult = {
   users: User[];
-  pagination?: unknown;
+  pagination?: Pagination;
 };
 
 export type CategoryItem = {
@@ -217,7 +224,7 @@ export async function getCategories() {
   return result.data.categories || [];
 }
 
-export async function getDocuments(params: Record<string, string | number | undefined> = {}) {
+function buildQueryString(params: Record<string, string | number | undefined> = {}) {
   const searchParams = new URLSearchParams();
 
   Object.entries(params).forEach(([key, value]) => {
@@ -227,7 +234,16 @@ export async function getDocuments(params: Record<string, string | number | unde
   });
 
   const query = searchParams.toString();
-  const result = await request<ApiResponse<DocumentItem[]>>(`/documents${query ? `?${query}` : ''}`);
+  return query ? `?${query}` : '';
+}
+
+export async function getDocuments(params: Record<string, string | number | undefined> = {}) {
+  const result = await request<ApiResponse<DocumentItem[]>>(`/documents${buildQueryString(params)}`);
+  return { documents: result.data, pagination: result.pagination };
+}
+
+export async function getMyDocuments(params: Record<string, string | number | undefined> = {}) {
+  const result = await request<ApiResponse<DocumentItem[]>>(`/documents/my-documents${buildQueryString(params)}`);
   return { documents: result.data, pagination: result.pagination };
 }
 
@@ -393,12 +409,7 @@ export async function downloadDocument(id: string, fallbackFileName: string) {
     const payload = await response.json();
     const url = payload?.data?.downloadUrl;
     if (url) {
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = payload?.data?.fileName || fallbackFileName;
-      anchor.target = '_blank';
-      anchor.rel = 'noopener noreferrer';
-      anchor.click();
+      downloadFileFromUrl(url, payload?.data?.fileName || fallbackFileName);
       return;
     }
   }
