@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2, Tag, AlertCircle, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Button } from '@/app/components/ui/button';
-import { Input } from '@/app/components/ui/input';
-import { Card, CardContent } from '@/app/components/ui/card';
+import { Plus, Edit, Trash2, Tag, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Button } from '../../components/ui/button';
+import { Input } from '../../components/ui/input';
+import { Card, CardContent } from '../../components/ui/card';
 import {
   Table,
   TableBody,
@@ -10,12 +10,20 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/app/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
-import { Label } from '@/app/components/ui/label';
-import { Textarea } from '@/app/components/ui/textarea';
+} from '../../components/ui/table';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../components/ui/dialog';
+import { Label } from '../../components/ui/label';
+import { Textarea } from '../../components/ui/textarea';
 import { apiRequest } from '../../services/api';
 import { toast } from 'sonner';
+
+const glowCard =
+  'border-sky-500/10 dark:border-sky-400/10 bg-white dark:bg-slate-900 ' +
+  'shadow-[0_0_0_1px_rgba(56,189,248,0.06),0_8px_30px_-8px_rgba(56,189,248,0.35)] ' +
+  'dark:shadow-[0_0_0_1px_rgba(56,189,248,0.08),0_8px_35px_-6px_rgba(56,189,248,0.25)] ' +
+  'hover:shadow-[0_0_0_1px_rgba(56,189,248,0.12),0_12px_45px_-8px_rgba(56,189,248,0.55)] ' +
+  'dark:hover:shadow-[0_0_0_1px_rgba(56,189,248,0.18),0_12px_45px_-8px_rgba(56,189,248,0.45)] ' +
+  'transition-shadow duration-300';
 
 interface Category {
   id: string;
@@ -24,10 +32,17 @@ interface Category {
   createdAt: string;
 }
 
+function normalizeSearchText(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .trim();
+}
+
 export function CategoryPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 10;
@@ -41,13 +56,12 @@ export function CategoryPage() {
 
   const fetchCategories = async () => {
     setLoading(true);
-    setError(null);
     try {
       const data = await apiRequest('/categories');
       setCategories(data.categories || data);
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Lỗi khi tải danh sách danh mục.');
+      toast.error(err.message || 'Lỗi khi tải danh sách danh mục.');
     } finally {
       setLoading(false);
     }
@@ -117,59 +131,48 @@ export function CategoryPage() {
     }
   };
 
-  const filteredCategories = categories.filter(
-    (c) =>
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      (c.description && c.description.toLowerCase().includes(search.toLowerCase()))
+  const filteredCategories = categories.filter((c) =>
+    normalizeSearchText(c.name).includes(normalizeSearchText(search)),
   );
   const totalPages = Math.max(1, Math.ceil(filteredCategories.length / PAGE_SIZE));
   const paginatedCategories = filteredCategories.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   return (
     <div className="space-y-8 text-slate-900 dark:text-slate-100">
-      {/* Title bar */}
-      <div className="flex flex-col gap-4 rounded-[1.75rem] border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-700/80 dark:bg-slate-950">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <Tag className="w-5 h-5 text-indigo-500" />
-              Quản lý danh mục tài liệu
-            </h2>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 font-medium">Danh sách các danh mục phân loại tài liệu (Kỹ thuật phần mềm, Trí tuệ nhân tạo, v.v.).</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 bg-gradient-to-br from-violet-500 via-indigo-500 to-fuchsia-500 rounded-xl flex items-center justify-center shadow-lg shadow-fuchsia-500/30">
+            <Tag className="w-6 h-6 text-white" />
           </div>
-          <Button onClick={openAddDialog} size="sm" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl">
-            <Plus className="w-4 h-4" />
-            Thêm danh mục
-          </Button>
+          <div>
+            <h1 className="text-3xl font-bold">Quản lý danh mục tài liệu</h1>
+            <p className="text-muted-foreground mt-1">Danh sách các danh mục (Kinh tế, Lập trình v.v.).</p>
+          </div>
         </div>
-
-        <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-          <label className="relative block">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
-            <Input
-              value={search}
-              onChange={(e) => {setSearch(e.target.value); setPage(1); }}
-              placeholder="Tìm kiếm danh mục..."
-              className="pl-10 rounded-xl"
-            />
-          </label>
-        </div>
+        <Button onClick={openAddDialog} size="sm" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl">
+          <Plus className="w-4 h-4" />
+          Thêm danh mục
+        </Button>
       </div>
 
-      {error && (
-        <div className="flex items-center gap-3 p-5 rounded-2xl border border-rose-200/50 bg-rose-50/50 text-rose-600 dark:border-rose-950/20 dark:bg-rose-950/10 dark:text-rose-400">
-          <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          <p className="text-sm font-medium">{error}</p>
-        </div>
-      )}
+      <Card className={glowCard}>
+        <CardContent className="p-4 md:p-6">
+          <div className="space-y-1">
+            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tìm kiếm</label>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              placeholder="Tìm kiếm danh mục..."
+              aria-label="Tìm kiếm danh mục"
+              className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-sky-400/40"
+            />
+          </div>
+        </CardContent>
+      </Card>
 
-      {loading ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-3">
-          <div className="w-8 h-8 border-4 border-indigo-600/30 border-t-indigo-600 rounded-full animate-spin"></div>
-          <p className="text-sm text-slate-500">Đang tải danh sách danh mục...</p>
-        </div>
-      ) : (
-        <Card className="border-border/50 rounded-2xl overflow-hidden shadow-sm">
-          <CardContent className="p-0 overflow-x-auto">
+      <Card className={glowCard}>
+        <CardContent className="p-4 md:p-6">
+          <div className="overflow-x-auto">
             <Table>
               <TableHeader className="bg-muted/40 border-b border-border">
                 <TableRow>
@@ -180,7 +183,13 @@ export function CategoryPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCategories.length === 0 ? (
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center py-12 text-muted-foreground">
+                      Đang tải danh sách danh mục...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredCategories.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center py-12 text-muted-foreground">
                       Không tìm thấy danh mục nào.
@@ -207,7 +216,7 @@ export function CategoryPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => openEditDialog(cat)}
-                            className="h-8 w-8 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/30 dark:hover:text-indigo-400 rounded-lg"
+                            className="h-8 w-8 rounded-full p-0 text-amber-600 hover:text-amber-700"
                           >
                             <Edit className="w-4 h-4" />
                           </Button>
@@ -215,7 +224,7 @@ export function CategoryPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => handleDelete(cat.id)}
-                            className="h-8 w-8 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/20 dark:hover:text-rose-400 rounded-lg"
+                            className="h-8 w-8 rounded-full p-0 text-destructive hover:text-destructive/80"
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -226,42 +235,42 @@ export function CategoryPage() {
                 )}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
-      )}
-      {filteredCategories.length > 0 && (
-        <div className="flex items-center justify-between px-1">
-          <p className="text-sm text-muted-foreground">
-            {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filteredCategories.length)}/{filteredCategories.length} danh mục
-          </p>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline" size="sm" className="h-8 w-8 p-0"
-              disabled={page === 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-              <Button
-                key={p}
-                variant={p === page ? 'default' : 'outline'}
-                size="sm" className="h-8 w-8 p-0 text-xs"
-                onClick={() => setPage(p)}
-              >
-                {p}
-              </Button>
-            ))}
-            <Button
-              variant="outline" size="sm" className="h-8 w-8 p-0"
-              disabled={page === totalPages}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
           </div>
-        </div>
-      )}
+          {filteredCategories.length > 0 && (
+            <div className="flex items-center justify-between mt-4 px-1">
+              <p className="text-sm text-muted-foreground">
+                {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filteredCategories.length)}/{filteredCategories.length} danh mục
+              </p>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline" size="sm" className="h-8 w-8 p-0"
+                  disabled={page === 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                  <Button
+                    key={p}
+                    variant={p === page ? 'default' : 'outline'}
+                    size="sm" className="h-8 w-8 p-0 text-xs"
+                    onClick={() => setPage(p)}
+                  >
+                    {p}
+                  </Button>
+                ))}
+                <Button
+                  variant="outline" size="sm" className="h-8 w-8 p-0"
+                  disabled={page === totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
       {/* Add / Edit Dialog */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="sm:max-w-[450px] rounded-3xl p-6 border-border bg-background">
