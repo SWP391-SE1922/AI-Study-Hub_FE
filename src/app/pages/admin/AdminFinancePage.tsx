@@ -20,34 +20,46 @@ const glowCard =
   'dark:hover:shadow-[0_0_0_1px_rgba(56,189,248,0.18),0_12px_45px_-8px_rgba(56,189,248,0.45)] ' +
   'transition-shadow duration-300';
 
+function formatCompactCurrency(value: number): string {
+  if (value >= 1_000_000_000) {
+    return `${(value / 1_000_000_000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} tỷ đ`;
+  }
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} triệu đ`;
+  }
+  return `${value.toLocaleString('vi-VN')}đ`;
+}
+
 const stats = [
   {
     title: 'Doanh thu tháng',
-    value: '125.400.000đ',
+    value: 125_400_000,
     description: 'Tăng 14% so với tháng trước',
     icon: DollarSign,
     badge: 'Tốt',
+    isCurrency: true,
   },
   {
     title: 'Số giao dịch',
-    value: '1.248',
+    value: 1_248,
     description: 'Giao dịch thành công trong tháng',
     icon: CreditCard,
     badge: 'Ổn định',
   },
   {
     title: 'Gói đăng ký',
-    value: '324',
+    value: 324,
     description: 'Người dùng đang dùng gói trả phí',
     icon: ListChecks,
     badge: 'Phát triển',
   },
   {
     title: 'Doanh thu trung bình',
-    value: '1.020.000đ',
+    value: 1_020_000,
     description: 'Doanh thu mỗi giao dịch',
     icon: ArrowUpRight,
     badge: 'Ổn định',
+    isCurrency: true,
   },
 ];
 
@@ -56,7 +68,7 @@ const transactions = [
     id: 'TXN-001',
     user: 'Nguyễn Văn A',
     plan: 'Gói Premium',
-    amount: '1.200.000đ',
+    amount: 1_200_000,
     status: 'Thành công',
     date: '02/07/2026',
   },
@@ -64,7 +76,7 @@ const transactions = [
     id: 'TXN-002',
     user: 'Trần Thị B',
     plan: 'Gói Standard',
-    amount: '420.000đ',
+    amount: 420_000,
     status: 'Thất bại',
     date: '01/07/2026',
   },
@@ -72,7 +84,7 @@ const transactions = [
     id: 'TXN-003',
     user: 'Lê Văn C',
     plan: 'Gói Premium',
-    amount: '1.200.000đ',
+    amount: 2_500_000_000,
     status: 'Thành công',
     date: '30/06/2026',
   },
@@ -80,7 +92,7 @@ const transactions = [
     id: 'TXN-004',
     user: 'Phạm Thị D',
     plan: 'Gói Basic',
-    amount: '180.000đ',
+    amount: 15_000_000_000,
     status: 'Chờ xử lý',
     date: '28/06/2026',
   },
@@ -104,7 +116,7 @@ export function AdminFinancePage() {
     <div className="space-y-6 text-slate-900 dark:text-slate-100">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 via-sky-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-cyan-500/30">
+          <div className="w-12 h-12 bg-gradient-to-br from-violet-500 via-indigo-500 to-fuchsia-500 rounded-xl flex items-center justify-center shadow-lg shadow-fuchsia-500/30">
             <BarChart3 className="w-6 h-6 text-white" />
           </div>
           <div>
@@ -112,7 +124,7 @@ export function AdminFinancePage() {
             <p className="text-muted-foreground mt-1">Tổng quan doanh thu, giao dịch và gói đăng ký.</p>
           </div>
         </div>
-        <Button size="sm" className="gap-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl">
+        <Button size="sm" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl">
           Xem báo cáo đầy đủ
         </Button>
       </div>
@@ -126,15 +138,20 @@ export function AdminFinancePage() {
                   <CardTitle>{item.title}</CardTitle>
                   <CardDescription>{item.description}</CardDescription>
                 </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                  <item.icon className="w-5 h-5" />
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 dark:bg-indigo-500/10">
+                  <item.icon className="w-5 h-5 text-indigo-600" />
                 </div>
               </div>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-3xl font-bold">{item.value}</p>
+              <div className="flex flex-wrap items-center gap-2 min-w-0">
+                <div className="min-w-0">
+                  <p
+                    className="text-xl sm:text-2xl md:text-3xl font-bold truncate"
+                    title={item.isCurrency ? `${(item.value as number).toLocaleString('vi-VN')}đ` : typeof item.value === 'number' ? item.value.toLocaleString('vi-VN') : item.value}
+                  >
+                    {item.isCurrency ? formatCompactCurrency(item.value as number) : typeof item.value === 'number' ? item.value.toLocaleString('vi-VN') : item.value}
+                  </p>
                 </div>
                 <Badge variant="secondary">{item.badge}</Badge>
               </div>
@@ -179,7 +196,11 @@ export function AdminFinancePage() {
                     <TableCell className="py-3 px-4 font-medium">{transaction.id}</TableCell>
                     <TableCell className="py-3 px-4">{transaction.user}</TableCell>
                     <TableCell className="py-3 px-4">{transaction.plan}</TableCell>
-                    <TableCell className="py-3 px-4">{transaction.amount}</TableCell>
+                    <TableCell className="py-3 px-4 max-w-[120px] truncate">
+                      <span title={`${transaction.amount.toLocaleString('vi-VN')}đ`}>
+                        {formatCompactCurrency(transaction.amount)}
+                      </span>
+                    </TableCell>
                     <TableCell className="py-3 px-4">
                       <Badge variant={transaction.status === 'Thành công' ? 'default' : transaction.status === 'Chờ xử lý' ? 'secondary' : 'destructive'}>
                         {transaction.status}
