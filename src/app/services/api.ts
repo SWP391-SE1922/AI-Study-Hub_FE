@@ -23,6 +23,8 @@ export type User = {
   role?: string;
   avatarUrl?: string | null;
   isVerified?: boolean;
+  isLocked?: boolean;
+  lockedUntil?: string | null;
   usedStorage?: number;
   storageLimit?: number;
   createdAt?: string;
@@ -441,6 +443,15 @@ export async function updateUserRole(id: string, role: 'GUEST' | 'USER' | 'ADMIN
   const result = await request<ApiResponse<{ user: User }>>(`/users/${id}/role`, {
     method: 'PUT',
     body: JSON.stringify({ role }),
+  });
+  return result.data.user;
+}
+
+export async function lockUser(id: string, duration: '3d' | '7d' | 'permanent') {
+  // TODO: backend cần bổ sung endpoint /users/:id/lock để xử lý tác vụ khóa tài khoản
+  const result = await request<ApiResponse<{ user: User }>>(`/users/${id}/lock`, {
+    method: 'PUT',
+    body: JSON.stringify({ duration }),
   });
   return result.data.user;
 }

@@ -19,7 +19,7 @@ import { AdminPage } from './pages/admin/AdminPage';
 import { CategoryPage } from './pages/admin/adminCategory';
 import { SubjectPage } from './pages/admin/SubjectPage';
 import { AdminDocumentDetailPage } from './pages/admin/AdminDocumentDetailPage';
-import AdminAiChatPage from './pages/admin/AdminAiChatPage';
+import { AdminFinancePage } from './pages/admin/AdminFinancePage';
 
 // Layouts
 import { MainLayout } from './components/layout/MainLayout';
@@ -110,7 +110,7 @@ export default function App() {
               <Route path="/admin/users" element={<AdminPage />} />
               <Route path="/admin/documents" element={<AdminPage />} />
               <Route path="/admin/documents/:id" element={<AdminDocumentDetailPage />} />
-              <Route path="/admin/aichat" element={<AdminAiChatPage />} />
+              <Route path="/admin/finance" element={<AdminFinancePage />} />
               <Route path="/admin/category" element={<CategoryPage />} />
               <Route path="/admin/subjects" element={<SubjectPage />} />
             </Route>
