@@ -49,6 +49,13 @@ export type CategoryItem = {
   _count?: { documents: number };
 };
 
+export type SubjectItem = {
+  id: string;
+  name: string;
+  code?: string | null;
+  description?: string | null;
+};
+
 export type DocumentVersionItem = {
   id: string;
   version: number;
@@ -224,6 +231,15 @@ export async function updateProfile(data: Pick<User, 'fullName' | 'avatarUrl'>) 
 export async function getCategories() {
   const result = await request<ApiResponse<{ categories: CategoryItem[] }>>('/categories');
   return result.data.categories || [];
+}
+
+// Lấy danh sách môn học. Backend có thể trả về data: SubjectItem[]
+// hoặc data: { subjects: SubjectItem[] } tuỳ cách implement, nên xử lý cả 2 dạng.
+export async function getSubjects() {
+  const result = await request<ApiResponse<{ subjects: SubjectItem[] }> | ApiResponse<SubjectItem[]>>('/subjects');
+  const payload = result as any;
+  if (Array.isArray(payload?.data)) return payload.data as SubjectItem[];
+  return payload?.data?.subjects || [];
 }
 
 function buildQueryString(params: Record<string, string | number | undefined> = {}) {
@@ -523,4 +539,14 @@ export async function getPublicDocuments(params: Record<string, string | number 
   // Gọi tới endpoint /documents kèm theo query string
   const result = await request<ApiResponse<DocumentItem[]>>(`/documents${query ? `?${query}` : ''}`);
   return { documents: result.data, pagination: result.pagination };
+}
+export async function createVnpayPaymentUrl(amount: number, bankCode?: string) {
+  const res = await fetch(`${API_BASE_URL}/api/vnpay/create_payment_url`, {   // ❌ lỗi 1: lặp /api
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },                         // ❌ lỗi 2: thiếu Authorization token
+    body: JSON.stringify({ amount, bankCode, language: 'vn' }),
+  });
+  if (!res.ok) throw new Error('Không thể tạo thanh toán');
+  const data = await res.json();
+  return data.paymentUrl as string;
 }

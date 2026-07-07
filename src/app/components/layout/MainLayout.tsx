@@ -1,10 +1,15 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, FileText, MessageSquare, Settings, LogOut, Menu, X, Sun, Moon, Bot, Shield, Sparkles, Globe } from 'lucide-react';
+import {
+  LayoutDashboard, FileText, MessageSquare, Settings, LogOut,
+  Menu, X, Sun, Moon, Bot, Shield, Sparkles, Globe,
+  Check, Crown, HardDrive, ChevronRight, ShieldCheck,
+} from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { toast } from 'sonner';
 import { Button } from '../ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
-import { getMe, getToken, logoutLocal, type User } from '../../services/api';
+import { getMe, getToken, logoutLocal, createVnpayPaymentUrl, type User } from '../../services/api';
 
 function readStoredUser(): Partial<User> {
   try {
@@ -21,9 +26,261 @@ function getInitials(name?: string, email?: string) {
   return source.slice(0, 2).toUpperCase();
 }
 
+// Gói mặc định (free) là 5 GB. Nếu storageLimit lớn hơn, coi như user đã nâng cấp Pro.
+// LƯU Ý ĐƠN VỊ: `storageLimit` từ backend trả về theo BYTE (khớp với Dashboard hiển thị
+// "Tổng: 5.0 GB" / "Đã dùng: 14 MB"), nên phải đổi sang GB trước khi so sánh.
+// Khi backend có field riêng (vd. user.plan / user.isPro), nên dùng thẳng field đó
+// thay vì suy luận từ storageLimit — sẽ chính xác 100% và không phụ thuộc đơn vị.
+const BYTES_PER_GB = 1024 ** 3;
+const FREE_STORAGE_LIMIT_GB = 5;
+
+function getProLabel(storageLimitBytes?: number): string | null {
+  if (!storageLimitBytes) return null;
+  const storageLimitGB = storageLimitBytes / BYTES_PER_GB;
+  if (storageLimitGB <= FREE_STORAGE_LIMIT_GB) return null;
+  if (storageLimitGB >= 200) return 'PREMIUM';
+  return 'PRO';
+}
+
+// ─── Plans ────────────────────────────────────────────────────────────────────
+const PLANS = [
+  {
+    id: 'pro_10',
+    name: 'Pro 10 GB',
+    storage: '10 GB',
+    price: 29_000,
+    priceLabel: '29.000 ₫',
+    period: '/ tháng',
+    color: 'from-indigo-500 to-violet-500',
+    ring: 'ring-indigo-400/40',
+    popular: false,
+    features: ['10 GB lưu trữ', 'Không giới hạn tải lên', 'Ưu tiên hỗ trợ', 'Lịch sử 1 năm'],
+  },
+  {
+    id: 'pro_50',
+    name: 'Pro 50 GB',
+    storage: '50 GB',
+    price: 79_000,
+    priceLabel: '79.000 ₫',
+    period: '/ tháng',
+    color: 'from-fuchsia-500 to-pink-500',
+    ring: 'ring-fuchsia-400/40',
+    popular: true,
+    features: ['50 GB lưu trữ', 'Không giới hạn tải lên', 'Ưu tiên hỗ trợ cao', 'Lịch sử vĩnh viễn', 'Badge Pro'],
+  },
+  {
+    id: 'pro_200',
+    name: 'Pro 200 GB',
+    storage: '200 GB',
+    price: 199_000,
+    priceLabel: '199.000 ₫',
+    period: '/ tháng',
+    color: 'from-amber-500 to-orange-500',
+    ring: 'ring-amber-400/40',
+    popular: false,
+    features: ['200 GB lưu trữ', 'Không giới hạn mọi thứ', 'Hỗ trợ 24/7', 'Lịch sử vĩnh viễn', 'Badge Premium', 'API access'],
+  },
+];
+
+type UpgradeStep = 'plans' | 'payment';
+
+function UpgradeModal({ onClose }: { onClose: () => void }) {
+  const [step, setStep] = useState<UpgradeStep>('plans');
+  const [selected, setSelected] = useState(PLANS[1]);
+  const [paying, setPaying] = useState(false);
+
+  // Gọi API thật của backend: POST /vnpay/create_payment_url
+  const handlePayNow = async () => {
+    setPaying(true);
+    try {
+      // Lưu lại gói đã chọn để trang /payment-result biết hiển thị đúng thông tin
+      localStorage.setItem('pendingPlan', JSON.stringify(selected));
+
+      const paymentUrl = await createVnpayPaymentUrl(selected.price);
+      // Điều hướng thẳng trình duyệt sang cổng thanh toán VNPay
+      window.location.href = paymentUrl;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Không thể tạo thanh toán, vui lòng thử lại');
+      setPaying(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      {/* backdrop */}
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      <div className="relative z-10 w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white dark:bg-[#0F0C1D] rounded-3xl shadow-2xl shadow-black/40 border border-white/10">
+        {/* Header */}
+        <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-white/10 bg-white/95 dark:bg-[#0F0C1D]/95 backdrop-blur-md rounded-t-3xl">
+          <div className="flex items-center gap-3">
+            {step !== 'plans' && (
+              <button
+                type="button"
+                onClick={() => setStep('plans')}
+                aria-label="Quay lại bước trước"
+                title="Quay lại bước trước"
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-all"
+              >
+                <ChevronRight className="w-4 h-4 rotate-180" />
+              </button>
+            )}
+            <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-xl flex items-center justify-center">
+              <Crown className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <h2 className="font-extrabold text-slate-900 dark:text-white text-sm">
+                {step === 'plans' && 'Nâng cấp tài khoản Pro'}
+                {step === 'payment' && 'Thanh toán VNPay'}
+              </h2>
+              <p className="text-[10px] text-slate-400">
+                {step === 'plans' && 'Chọn gói phù hợp với nhu cầu'}
+                {step === 'payment' && `Gói ${selected.name} · ${selected.priceLabel}${selected.period}`}
+              </p>
+            </div>
+          </div>
+
+          {/* Step indicator */}
+          <div className="flex items-center gap-1.5 mr-8">
+            {(['plans', 'payment'] as UpgradeStep[]).map((s) => (
+              <div
+                key={s}
+                className={`h-1.5 rounded-full transition-all duration-300 ${s === step ? 'w-6 bg-indigo-500' : 'w-3 bg-slate-200 dark:bg-white/10'
+                  }`}
+              />
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Đóng hộp thoại"
+            title="Đóng hộp thoại"
+            className="absolute top-4 right-4 w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-all"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* ── Step 1: Plans ──────────────────────────────────────────────── */}
+        {step === 'plans' && (
+          <div className="p-6 space-y-4">
+            <p className="text-sm text-slate-500 dark:text-slate-400 text-center">
+              Mua thêm dung lượng lưu trữ để tải lên không giới hạn tài liệu học tập.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {PLANS.map((plan) => (
+                <button
+                  key={plan.id}
+                  type="button"
+                  onClick={() => setSelected(plan)}
+                  className={`relative text-left rounded-2xl p-4 border-2 transition-all duration-200 ${selected.id === plan.id
+                      ? `border-transparent ring-2 ${plan.ring} bg-gradient-to-b from-white to-slate-50 dark:from-white/10 dark:to-white/5 shadow-lg`
+                      : 'border-slate-100 dark:border-white/10 hover:border-slate-200 dark:hover:border-white/20 bg-white dark:bg-white/5'
+                    }`}
+                >
+                  {plan.popular && (
+                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-gradient-to-r from-fuchsia-500 to-pink-500 text-white text-[10px] font-bold px-3 py-0.5 rounded-full shadow">
+                      PHỔ BIẾN
+                    </span>
+                  )}
+
+                  <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${plan.color} flex items-center justify-center mb-3 shadow-md`}>
+                    <HardDrive className="w-4 h-4 text-white" />
+                  </div>
+
+                  <p className="font-extrabold text-slate-900 dark:text-white text-sm">{plan.name}</p>
+                  <p className="text-xs text-slate-400 mb-3">{plan.storage} dung lượng</p>
+
+                  <p className="font-extrabold text-lg text-slate-900 dark:text-white leading-none">
+                    {plan.priceLabel}
+                  </p>
+                  <p className="text-[10px] text-slate-400 mb-3">{plan.period}</p>
+
+                  <ul className="space-y-1">
+                    {plan.features.map((f) => (
+                      <li key={f} className="flex items-center gap-1.5 text-[11px] text-slate-600 dark:text-slate-300">
+                        <Check className="w-3 h-3 text-emerald-500 shrink-0" />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+
+                  {selected.id === plan.id && (
+                    <div className={`absolute inset-x-0 bottom-0 h-1 rounded-b-2xl bg-gradient-to-r ${plan.color}`} />
+                  )}
+                </button>
+              ))}
+            </div>
+
+            <Button
+              onClick={() => setStep('payment')}
+              className="w-full h-12 bg-gradient-to-r from-indigo-500 to-fuchsia-500 hover:from-indigo-600 hover:to-fuchsia-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/25 hover:-translate-y-0.5 transition-all"
+            >
+              Tiếp tục thanh toán
+              <ChevronRight className="w-4 h-4 ml-1" />
+            </Button>
+
+            <p className="text-center text-[11px] text-slate-400 flex items-center justify-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+              Bảo mật bởi VNPay · Hủy bất cứ lúc nào
+            </p>
+          </div>
+        )}
+
+        {/* ── Step 2: Payment (gọi API thật) ────────────────────────────── */}
+        {step === 'payment' && (
+          <div className="p-6 space-y-5">
+            {/* Order summary */}
+            <div className={`rounded-2xl p-4 bg-gradient-to-br ${selected.color} text-white`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold opacity-80">Gói đã chọn</p>
+                  <p className="font-extrabold text-lg">{selected.name}</p>
+                  <p className="text-sm opacity-90">{selected.storage} dung lượng lưu trữ</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-semibold opacity-80">Tổng tiền</p>
+                  <p className="font-extrabold text-2xl">{selected.priceLabel}</p>
+                  <p className="text-xs opacity-80">{selected.period}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 p-4 text-sm text-slate-600 dark:text-slate-300">
+              Bấm nút bên dưới để chuyển sang trang thanh toán VNPay. Sau khi hoàn tất
+              giao dịch, hệ thống sẽ tự động đưa bạn quay lại và kích hoạt gói.
+            </div>
+
+            <Button
+              onClick={handlePayNow}
+              disabled={paying}
+              className="w-full h-12 bg-gradient-to-r from-indigo-500 to-fuchsia-500 hover:from-indigo-600 hover:to-fuchsia-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/25 hover:-translate-y-0.5 transition-all disabled:opacity-60 disabled:hover:translate-y-0"
+            >
+              {paying ? 'Đang tạo thanh toán...' : 'Thanh toán qua VNPay'}
+              {!paying && <ChevronRight className="w-4 h-4 ml-1" />}
+            </Button>
+
+            <p className="text-center text-[11px] text-slate-400 flex items-center justify-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+              Bảo mật bởi VNPay · Hủy bất cứ lúc nào
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── MainLayout ───────────────────────────────────────────────────────────────
 export function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<Partial<User>>(() => readStoredUser());
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const location = useLocation();
   const { theme, setTheme } = useTheme();
 
@@ -31,20 +288,18 @@ export function MainLayout() {
     const refreshUser = async () => {
       setCurrentUser(readStoredUser());
       if (!getToken()) return;
-
       try {
         const user = await getMe();
         localStorage.setItem('user', JSON.stringify(user));
         setCurrentUser(user);
       } catch {
-        // Giữ user trong localStorage nếu API tạm thời lỗi.
+        // keep localStorage user on transient API error
       }
     };
 
     refreshUser();
     window.addEventListener('authChange', refreshUser);
     window.addEventListener('storage', refreshUser);
-
     return () => {
       window.removeEventListener('authChange', refreshUser);
       window.removeEventListener('storage', refreshUser);
@@ -52,6 +307,8 @@ export function MainLayout() {
   }, []);
 
   const initials = useMemo(() => getInitials(currentUser.fullName, currentUser.email), [currentUser]);
+  const proLabel = useMemo(() => getProLabel(currentUser.storageLimit), [currentUser.storageLimit]);
+  const isPro = Boolean(proLabel);
 
   const handleLogout = () => {
     logoutLocal();
@@ -64,7 +321,7 @@ export function MainLayout() {
     ...(isAdmin ? [{ path: '/admin', label: 'Admin', icon: Shield }] : []),
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/documents', label: 'Tài liệu của tôi', icon: FileText },
-    { path: '/public-documents', label: 'Tài liệu cộng đồng', icon: Globe }, // Thêm menu xem tài liệu public
+    { path: '/public-documents', label: 'Tài liệu cộng đồng', icon: Globe },
     { path: '/chat', label: 'Chat AI', icon: Bot },
     { path: '/profile', label: 'Settings', icon: Settings },
   ];
@@ -92,6 +349,10 @@ export function MainLayout() {
           0% { transform: scale(0.9); opacity: 0.8; }
           80%, 100% { transform: scale(1.6); opacity: 0; }
         }
+        @keyframes main-upgrade-bounce {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-2px); }
+        }
         .main-blob-1 { animation: main-blob-float-1 9s ease-in-out infinite; }
         .main-blob-2 { animation: main-blob-float-2 11s ease-in-out infinite; }
         .main-active-shimmer {
@@ -104,18 +365,16 @@ export function MainLayout() {
           background-size: 200% 100%;
           animation: main-shimmer 6s linear infinite;
         }
-        .main-status-ping {
-          animation: main-pulse-ring 1.8s cubic-bezier(0,0,0.2,1) infinite;
-        }
-        .main-logo-ring {
-          animation: main-border-glow 2.4s ease-in-out infinite;
-        }
+        .main-status-ping { animation: main-pulse-ring 1.8s cubic-bezier(0,0,0.2,1) infinite; }
+        .main-logo-ring   { animation: main-border-glow 2.4s ease-in-out infinite; }
+        .main-upgrade-btn { animation: main-upgrade-bounce 2.4s ease-in-out infinite; }
         @media (prefers-reduced-motion: reduce) {
-          .main-blob-1, .main-blob-2, .main-active-shimmer, .main-header-glow, .main-status-ping, .main-logo-ring {
-            animation: none !important;
-          }
+          .main-blob-1, .main-blob-2, .main-active-shimmer, .main-header-glow,
+          .main-status-ping, .main-logo-ring, .main-upgrade-btn { animation: none !important; }
         }
       `}</style>
+
+      {upgradeOpen && <UpgradeModal onClose={() => setUpgradeOpen(false)} />}
 
       {sidebarOpen && (
         <div
@@ -124,7 +383,7 @@ export function MainLayout() {
         />
       )}
 
-      {/* Header */}
+      {/* ── Header ─────────────────────────────────────────────────────── */}
       <header className="fixed top-0 left-0 right-0 h-16 border-b border-slate-200/70 dark:border-white/5 bg-white/80 dark:bg-[#0B0A1A]/80 backdrop-blur-md z-30 flex items-center justify-between px-4 lg:px-7 lg:pl-72 transition-colors duration-300">
         <div className="main-header-glow pointer-events-none absolute top-0 left-0 right-0 h-px opacity-70" />
 
@@ -137,7 +396,6 @@ export function MainLayout() {
           >
             <Menu className="w-5 h-5" />
           </Button>
-
           <Link to="/dashboard" className="group flex items-center gap-2.5 lg:hidden">
             <div className="relative w-9 h-9 bg-gradient-to-br from-violet-500 via-indigo-500 to-fuchsia-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/30 transition-transform duration-300 group-hover:scale-105 group-hover:rotate-3">
               <MessageSquare className="w-4 h-4" />
@@ -146,7 +404,27 @@ export function MainLayout() {
           </Link>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          {/* ── Upgrade / quản lý gói button ── */}
+          <button
+            type="button"
+            onClick={() => setUpgradeOpen(true)}
+            title={isPro ? 'Quản lý gói Pro' : 'Nâng cấp tài khoản Pro'}
+            className={`main-upgrade-btn relative flex items-center gap-1.5 px-3 h-9 rounded-xl text-xs font-bold
+              text-white shadow-md hover:-translate-y-0.5 transition-all duration-300
+              ${isPro
+                ? 'bg-gradient-to-r from-amber-400 to-orange-500 shadow-amber-500/30 hover:from-amber-500 hover:to-orange-600 hover:shadow-amber-500/50'
+                : 'bg-gradient-to-r from-violet-500 to-fuchsia-500 shadow-fuchsia-500/30 hover:from-violet-600 hover:to-fuchsia-600 hover:shadow-fuchsia-500/50'
+              }`}
+          >
+            <Crown className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">{isPro ? proLabel : 'Nâng cấp'}</span>
+            {!isPro && (
+              <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400 border border-white dark:border-[#0B0A1A]" />
+            )}
+          </button>
+
+          {/* Theme toggle */}
           <Button
             variant="ghost"
             size="icon"
@@ -158,24 +436,45 @@ export function MainLayout() {
             <Moon className="absolute w-4 h-4 rotate-90 scale-0 transition-all duration-500 dark:rotate-0 dark:scale-100 text-indigo-300" />
           </Button>
 
-          <div className="flex items-center gap-3 border-l border-slate-200 dark:border-white/10 pl-4">
+          {/* Avatar */}
+          <div className="flex items-center gap-3 border-l border-slate-200 dark:border-white/10 pl-3">
             <div className="relative">
-              <Avatar className="w-9 h-9 ring-2 ring-indigo-500/30 ring-offset-2 ring-offset-white dark:ring-offset-[#0B0A1A] transition-shadow duration-300 hover:shadow-[0_0_18px_-2px_rgba(139,92,246,0.6)]">
+              <Avatar
+                className={`w-9 h-9 ring-2 ring-offset-2 ring-offset-white dark:ring-offset-[#0B0A1A] transition-shadow duration-300 ${isPro
+                    ? 'ring-amber-400/60 hover:shadow-[0_0_18px_-2px_rgba(251,191,36,0.7)]'
+                    : 'ring-indigo-500/30 hover:shadow-[0_0_18px_-2px_rgba(139,92,246,0.6)]'
+                  }`}
+              >
                 <AvatarImage src={currentUser.avatarUrl || ''} alt={currentUser.fullName || currentUser.email} />
                 <AvatarFallback className="bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white text-xs font-bold">{initials}</AvatarFallback>
               </Avatar>
               <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-white dark:border-[#0B0A1A]" />
               <span className="main-status-ping absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400" />
+              {isPro && (
+                <span
+                  title={proLabel === 'PREMIUM' ? 'Tài khoản Premium' : 'Tài khoản Pro'}
+                  className="absolute -top-1.5 -left-1.5 w-4.5 h-4.5 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 border-2 border-white dark:border-[#0B0A1A] flex items-center justify-center shadow-sm"
+                >
+                  <Crown className="w-2.5 h-2.5 text-white" />
+                </span>
+              )}
             </div>
-            <div className="hidden sm:block text-left max-w-[220px]">
-              <p className="text-xs font-bold text-foreground truncate">{currentUser.fullName || 'Sinh viên'}</p>
+            <div className="hidden sm:block text-left max-w-[180px]">
+              <div className="flex items-center gap-1.5">
+                <p className="text-xs font-bold text-foreground truncate">{currentUser.fullName || 'Sinh viên'}</p>
+                {isPro && (
+                  <span className="shrink-0 text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-gradient-to-r from-amber-400 to-orange-500 text-white tracking-wide">
+                    {proLabel}
+                  </span>
+                )}
+              </div>
               <p className="text-[10px] text-muted-foreground font-medium truncate">{currentUser.email || 'Chưa có email đăng nhập'}</p>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Sidebar */}
+      {/* ── Sidebar ────────────────────────────────────────────────────── */}
       <aside
         className={`fixed top-0 bottom-0 left-0 w-72 z-50 transform lg:transform-none lg:opacity-100 transition-all duration-300 ease-out flex flex-col justify-between
         bg-gradient-to-b from-[#1B1140] via-[#15102E] to-[#0B0A1A] text-slate-200
@@ -201,7 +500,7 @@ export function MainLayout() {
 
           <div className="p-4 space-y-1.5 lg:mt-3">
             <div className="flex items-center justify-between lg:hidden mb-4 px-1">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Menu quản lý</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Menu</span>
               <Button variant="ghost" size="icon" className="w-8 h-8 text-slate-300 hover:text-white" onClick={() => setSidebarOpen(false)}>
                 <X className="w-4 h-4" />
               </Button>
@@ -221,12 +520,8 @@ export function MainLayout() {
                         : 'text-slate-300 hover:text-white hover:bg-white/5 hover:translate-x-1 hover:shadow-[0_0_18px_-6px_rgba(167,139,250,0.6)]'
                       }`}
                   >
-                    <span
-                      className={`absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full bg-white/90 transition-all duration-300 ${isActive ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-0'
-                        }`}
-                    />
+                    <span className={`absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full bg-white/90 transition-all duration-300 ${isActive ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-0'}`} />
                     {isActive && <span className="main-active-shimmer absolute inset-0 pointer-events-none" />}
-
                     <Icon className={`w-4 h-4 shrink-0 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110 group-hover:-rotate-6'}`} />
                     <span className="relative">{item.label}</span>
                     {isActive && <Sparkles className="w-3.5 h-3.5 ml-auto opacity-80 relative" />}
