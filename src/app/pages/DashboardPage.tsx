@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   FileText,
@@ -8,19 +8,22 @@ import {
   HardDrive,
   BarChart3,
   AreaChart,
+  BookOpen,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Progress } from '../components/ui/progress';
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesiansGrid, Tooltip, BarChart, Bar, Cell } from 'recharts';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Cell } from 'recharts';
 import {
   getCategories,
   getDocuments,
   getMe,
+  getSubjects,
   getToken,
   type CategoryItem,
   type DocumentItem,
+  type SubjectItem,
   type User,
 } from '../services/api';
 
@@ -67,6 +70,7 @@ const glowCard =
 export function DashboardPage() {
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
+  const [subjects, setSubjects] = useState<SubjectItem[]>([]);
   const [user, setUser] = useState<User | null>(() => {
     try {
       return JSON.parse(localStorage.getItem('user') || 'null');
@@ -79,17 +83,19 @@ export function DashboardPage() {
   const loadDashboard = async () => {
     setLoading(true);
     try {
-      const [docsResult, categoryResult] = await Promise.all([
+      const [docsResult, categoryResult, subjectResult] = await Promise.all([
         getDocuments({
           limit: 10,
           sortBy: 'createdAt',
           sortOrder: 'desc',
         }),
         getCategories().catch(() => []),
+        getSubjects().catch(() => []),
       ]);
 
       setDocuments(docsResult.documents || []);
       setCategories(categoryResult);
+      setSubjects(subjectResult);
 
       if (getToken()) {
         const currentUser = await getMe().catch(() => null);
@@ -172,6 +178,14 @@ export function DashboardPage() {
       iconBg: 'bg-emerald-50 dark:bg-emerald-500/10',
     },
     {
+      title: 'Tổng môn học',
+      value: String(subjects.length),
+      change: 'Tổng số môn học',
+      icon: BookOpen,
+      color: 'text-violet-500',
+      iconBg: 'bg-violet-50 dark:bg-violet-500/10',
+    },
+    {
       title: 'Dung lượng đã dùng',
       value: formatFileSize(usedStorage),
       change: `/ ${formatFileSize(storageLimit)}`,
@@ -192,8 +206,8 @@ export function DashboardPage() {
         </p>
       </div>
 
-      {/* Grid 3 thẻ Stats chính */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Grid 4 thẻ Stats chính */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, index) => (
           <Card key={index} className={glowCard}>
             <CardContent className="p-6">
@@ -231,6 +245,7 @@ export function DashboardPage() {
           <CardContent className="h-[240px] pl-2">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={lineChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                 <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} tickLine={false} />
                 <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} allowDecimals={false} />
                 <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderRadius: '8px', color: '#fff', fontSize: '12px' }} />
