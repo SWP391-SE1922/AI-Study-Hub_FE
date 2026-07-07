@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, FileText, MessageSquare, LogOut, Menu, X, Sun, Moon, Tag, BookOpen, Sparkles, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, LogOut, Menu, X, Sun, Moon, Tag, BookOpen, Sparkles, ShieldCheck, DollarSign } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Button } from '../ui/button';
 import { Avatar, AvatarFallback } from '../ui/avatar';
@@ -24,6 +24,7 @@ export function AdminLayout() {
       items: [
         { path: '/admin', label: 'Dashboard Admin', icon: LayoutDashboard, exact: true },
         { path: '/admin/users', label: 'Quản lý User', icon: Users },
+        { path: '/admin/finance', label: 'Quản lý Tài chính', icon: DollarSign },
       ],
     },
     {
@@ -32,12 +33,6 @@ export function AdminLayout() {
         { path: '/admin/subjects', label: 'Quản lý Môn học', icon: BookOpen },
         { path: '/admin/category', label: 'Quản lý Danh mục', icon: Tag },
         { path: '/admin/documents', label: 'Quản lý Tài liệu', icon: FileText },
-      ],
-    },
-    {
-      title: 'TÍNH NĂNG AI',
-      items: [
-        { path: '/admin/aichat', label: 'AI Chat Admin', icon: MessageSquare },
       ],
     },
   ];

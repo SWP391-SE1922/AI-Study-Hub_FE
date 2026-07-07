@@ -2,24 +2,18 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Activity,
-  AlertCircle,
   BarChart3,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
-  Database,
   FileText,
-  FolderOpen,
   HardDrive,
   History,
-
   RefreshCw,
-  Edit,
   Shield,
-  Trash2,
   TrendingUp,
-  UserCheck,
   Users,
+  MoreVertical,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
@@ -28,22 +22,14 @@ import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Avatar, AvatarFallback } from '../../components/ui/avatar';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../components/ui/dialog';
-import { DocumentMetadataDialog } from '../../components/documents/DocumentMetadataDialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../components/ui/dropdown-menu';
 import {
-  deleteDocument,
-  deleteUser,
-  getCategories,
-
   getDocuments,
   getDocumentVersions,
   getMe,
   getUsers,
-  toAbsoluteFileUrl,
-  updateDocument,
-  updateUserRole,
-  type CategoryItem,
+  lockUser,
   type DocumentItem,
-  type DocumentMetadata,
   type DocumentVersionItem,
   type User,
 } from '../../services/api';
@@ -219,12 +205,9 @@ function LineTrendChart({
 export function AdminPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
-  const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [editingDocument, setEditingDocument] = useState<DocumentItem | null>(null);
-  const [editLoading, setEditLoading] = useState(false);
   const [versionDocument, setVersionDocument] = useState<DocumentItem | null>(null);
   const [versions, setVersions] = useState<DocumentVersionItem[]>([]);
   const [versionLoading, setVersionLoading] = useState(false);
@@ -261,7 +244,6 @@ const pageMode = location.pathname.includes('/admin/users')
     // Không dùng Promise.all cứng để tránh 1 API lỗi làm hỏng toàn bộ trang admin.
     const nextUsers: User[] = [];
     let nextDocuments: DocumentItem[] = [];
-    let nextCategories: CategoryItem[] = [];
     let nextCurrentUser: User | null = null;
 
     try {
@@ -279,12 +261,6 @@ const pageMode = location.pathname.includes('/admin/users')
     }
 
     try {
-      nextCategories = await getCategories();
-    } catch {
-      nextCategories = [];
-    }
-
-    try {
       nextCurrentUser = await getMe();
     } catch {
       nextCurrentUser = null;
@@ -292,7 +268,6 @@ const pageMode = location.pathname.includes('/admin/users')
 
     setUsers(nextUsers);
     setDocuments(nextDocuments);
-    setCategories(nextCategories);
     setCurrentUser(nextCurrentUser);
     if (pageMode === "documents") {
     setDocSearch("");
@@ -313,18 +288,12 @@ const pageMode = location.pathname.includes('/admin/users')
   const storageUsed = useMemo(() => users.reduce((sum, user) => sum + Number(user.usedStorage || 0), 0), [users]);
   const totalDownloads = useMemo(() => documents.reduce((sum, doc) => sum + Number(doc.downloadCount || 0), 0), [documents]);
   const verifiedUsers = useMemo(() => users.filter((user) => user.isVerified).length, [users]);
-  const adminUsers = useMemo(() => users.filter((user) => user.role === 'ADMIN').length, [users]);
-  const publicDocuments = useMemo(() => documents.filter((doc) => doc.isPublic !== false).length, [documents]);
-  const privateDocuments = Math.max(documents.length - publicDocuments, 0);
-  const unclassifiedDocuments = useMemo(
-    () => documents.filter((doc) => !doc.category?.name && !doc.subject && !doc.subjectRef?.name).length,
-    [documents],
-  );
+  
 
   const stats = [
     { title: 'Tổng người dùng', value: String(users.length), change: `${verifiedUsers} đã xác thực`, icon: Users, color: 'text-sky-500', iconBg: 'bg-sky-50 dark:bg-sky-500/10' },
-    { title: 'Tổng tài liệu', value: String(documents.length), change: `${publicDocuments} công khai`, icon: FileText, color: 'text-indigo-500', iconBg: 'bg-indigo-50 dark:bg-indigo-500/10' },
-    { title: 'Tổng lượt tải', value: String(totalDownloads), change: 'Từ API documents', icon: TrendingUp, color: 'text-emerald-500', iconBg: 'bg-emerald-50 dark:bg-emerald-500/10' },
+    { title: 'Tổng tài liệu', value: String(documents.length) , icon: FileText, color: 'text-indigo-500', iconBg: 'bg-indigo-50 dark:bg-indigo-500/10' },
+    { title: 'Tổng lượt tải', value: String(totalDownloads), icon: TrendingUp, color: 'text-emerald-500', iconBg: 'bg-emerald-50 dark:bg-emerald-500/10' },
     { title: 'Dung lượng đã dùng', value: formatFileSize(storageUsed), change: 'Toàn hệ thống', icon: HardDrive, color: 'text-fuchsia-500', iconBg: 'bg-fuchsia-50 dark:bg-fuchsia-500/10' },
   ];
 
@@ -342,18 +311,6 @@ const pageMode = location.pathname.includes('/admin/users')
 
     return Array.from(map.values()).sort((a, b) => b.count - a.count).slice(0, 6);
   }, [documents]);
-
-
-  const roleStats = useMemo(() => {
-    const roles = ['ADMIN', 'USER', 'GUEST'];
-    return roles.map((role) => ({
-      role,
-      count: users.filter((user) => (user.role || 'USER') === role).length,
-    }));
-  }, [users]);
-
-  const maxRoleCount = Math.max(...roleStats.map((item) => item.count), 1);
-
   const uploadTimeline = useMemo(() => {
     const days = Array.from({ length: 7 }, (_, index) => {
       const date = new Date();
@@ -490,56 +447,23 @@ const pageMode = location.pathname.includes('/admin/users')
     });
     return Array.from(types).sort((a, b) => a.localeCompare(b, 'vi'));
   }, [documents]);
-  const topDocuments = useMemo(
-    () => [...documents].sort((a, b) => Number(b.downloadCount || 0) - Number(a.downloadCount || 0)).slice(0, 5),
-    [documents],
-  );
 
-  const handleChangeRole = async (user: User, role: string) => {
+  const handleLockUser = async (user: User, duration: '3d' | '7d' | 'permanent') => {
     if (!user.id) return;
+    if (user.id === currentUser?.id) {
+      toast.error('Không thể khóa chính tài khoản admin đang đăng nhập.');
+      return;
+    }
+
     setActionLoading(user.id);
     try {
-      await updateUserRole(user.id, role);
-      toast.success('Đã cập nhật vai trò người dùng');
+      await lockUser(user.id, duration);
+      toast.success('Đã khóa tài khoản');
       await loadAdminData();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Không thể cập nhật vai trò');
+      toast.error(error instanceof Error ? error.message : 'Không thể khóa tài khoản');
     } finally {
       setActionLoading(null);
-    }
-  };
-
-  const handleDeleteDocument = async (documentItem: DocumentItem) => {
-    if (!documentItem.id) return;
-
-    const ok = window.confirm(`Xóa tài liệu "${documentItem.title}"? Thao tác này không thể hoàn tác.`);
-    if (!ok) return;
-
-    setActionLoading(documentItem.id);
-    try {
-      await deleteDocument(documentItem.id);
-      toast.success('Đã xóa tài liệu');
-      await loadAdminData();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Không thể xóa tài liệu');
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleEditDocument = async (metadata: DocumentMetadata, file?: File | null) => {
-    if (!editingDocument?.id) return;
-
-    setEditLoading(true);
-    try {
-      const updatedDocument = await updateDocument(editingDocument.id, metadata, file);
-      setDocuments((prev) => prev.map((doc) => (doc.id === editingDocument.id ? { ...doc, ...updatedDocument } : doc)));
-      toast.success('Đã sửa tài liệu');
-      setEditingDocument(null);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Không thể sửa tài liệu');
-    } finally {
-      setEditLoading(false);
     }
   };
 
@@ -559,28 +483,6 @@ const pageMode = location.pathname.includes('/admin/users')
     }
   };
 
-  const handleDeleteUser = async (user: User) => {
-    if (!user.id) return;
-    if (user.id === currentUser?.id) {
-      toast.error('Không thể xóa chính tài khoản admin đang đăng nhập.');
-      return;
-    }
-
-    const ok = window.confirm(`Xóa tài khoản ${user.email}? Thao tác này sẽ xóa cả tài liệu của tài khoản đó.`);
-    if (!ok) return;
-
-    setActionLoading(user.id);
-    try {
-      await deleteUser(user.id);
-      toast.success('Đã xóa người dùng');
-      await loadAdminData();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Không thể xóa người dùng');
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
   const renderPageTitle = () => {
     if (pageMode === 'users') {
       return {
@@ -594,7 +496,7 @@ const pageMode = location.pathname.includes('/admin/users')
       return {
         icon: FileText,
         title: 'Quản lý tài liệu',
-        description: 'Xem danh sách tài liệu, sửa và xóa tài liệu không phù hợp.',
+        description: 'Xem danh sách tài liệu.',
       };
     }
 
@@ -953,18 +855,13 @@ const pageMode = location.pathname.includes('/admin/users')
                           </div>
                         </TableCell>
                         <TableCell className="py-4 px-4 text-muted-foreground">{user.email}</TableCell>
-                        <TableCell className="py-4 px-4">
-                          <select
-                            value={user.role || 'USER'}
-                            disabled={actionLoading === user.id}
-                            onChange={(e) => handleChangeRole(user, e.target.value)}
-                            aria-label={`Vai trò của ${user.fullName || user.email}`}
-                            className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
-                          >
-                            <option value="USER">USER</option>
-                            <option value="ADMIN">ADMIN</option>
-                            <option value="GUEST">GUEST</option>
-                          </select>
+                        <TableCell className="py-4 px-4 space-y-2">
+                          <Badge>{user.role || 'USER'}</Badge>
+                          {(user.isLocked || user.lockedUntil) && (
+                            <Badge variant="destructive" className="uppercase">
+                              {user.lockedUntil ? `Đã khóa đến ${formatDate(user.lockedUntil)}` : 'Khóa vĩnh viễn'}
+                            </Badge>
+                          )}
                         </TableCell>
                         <TableCell className="py-4 px-4">
                           <Badge variant={user.isVerified ? 'default' : 'secondary'}>
@@ -974,16 +871,30 @@ const pageMode = location.pathname.includes('/admin/users')
                         <TableCell className="py-4 px-4 text-muted-foreground">{formatFileSize(user.usedStorage)}</TableCell>
                         <TableCell className="py-4 px-4 text-muted-foreground">{formatDate(user.createdAt)}</TableCell>
                         <TableCell className="py-4 px-6 text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive hover:text-destructive"
-                            disabled={actionLoading === user.id || user.id === currentUser?.id}
-                            onClick={() => handleDeleteUser(user)}
-                          >
-                            <Trash2 className="w-4 h-4 mr-1" />
-                            Xóa
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-2"
+                                disabled={actionLoading === user.id || user.id === currentUser?.id}
+                              >
+                                <MoreVertical className="w-4 h-4" />
+                                Khóa tài khoản
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-52">
+                              <DropdownMenuItem disabled={user.id === currentUser?.id} onSelect={() => handleLockUser(user, '3d')}>
+                                Khóa 3 ngày
+                              </DropdownMenuItem>
+                              <DropdownMenuItem disabled={user.id === currentUser?.id} onSelect={() => handleLockUser(user, '7d')}>
+                                Khóa 7 ngày
+                              </DropdownMenuItem>
+                              <DropdownMenuItem disabled={user.id === currentUser?.id} onSelect={() => handleLockUser(user, 'permanent')}>
+                                Khóa vĩnh viễn
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1169,45 +1080,27 @@ const pageMode = location.pathname.includes('/admin/users')
                       <TableCell className="py-4 px-4 text-muted-foreground">{formatDate(doc.createdAt)}</TableCell>
                       <TableCell className="py-4 px-6 text-center max-w-[144px] whitespace-nowrap">
                         <div className="inline-flex items-center justify-center gap-0.5">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 rounded-full p-0 text-sky-600 hover:text-sky-700"
-                            onClick={() => navigate(`/admin/documents/${doc.id}`)}
-                            aria-label="Xem"
-                          >
-                            <FileText className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 rounded-full p-0 text-amber-600 hover:text-amber-700"
-                            disabled={editLoading && editingDocument?.id === doc.id}
-                            onClick={() => setEditingDocument(doc)}
-                            aria-label="Sửa"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 rounded-full p-0 text-purple-600 hover:text-purple-700"
-                            disabled={versionLoading && versionDocument?.id === doc.id}
-                            onClick={() => handleViewDocumentVersions(doc)}
-                            aria-label="Version"
-                          >
-                            <History className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 rounded-full p-0 text-destructive hover:text-destructive/80"
-                            disabled={actionLoading === doc.id}
-                            onClick={() => handleDeleteDocument(doc)}
-                            aria-label="Xóa"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          <div className="inline-flex items-center justify-center gap-0.5">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-full p-0 text-sky-600 hover:text-sky-700"
+                              onClick={() => navigate(`/admin/documents/${doc.id}`)}
+                              aria-label="Xem"
+                            >
+                              <FileText className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-full p-0 text-purple-600 hover:text-purple-700"
+                              disabled={versionLoading && versionDocument?.id === doc.id}
+                              onClick={() => handleViewDocumentVersions(doc)}
+                              aria-label="Version"
+                            >
+                              <History className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -1251,26 +1144,6 @@ const pageMode = location.pathname.includes('/admin/users')
       )}
 
     
-      <DocumentMetadataDialog
-        open={Boolean(editingDocument)}
-        title="Sửa tài liệu"
-        submitLabel="Lưu thay đổi"
-        fileName={editingDocument?.fileName || editingDocument?.title}
-        categories={categories}
-        submitting={editLoading}
-        allowFileChange
-        initialValues={editingDocument ? {
-          title: editingDocument.title,
-          description: editingDocument.description || '',
-          subject: editingDocument.subjectRef?.name || editingDocument.subject || '',
-          categoryId: editingDocument.categoryId || editingDocument.category?.id || '',
-          isPublic: editingDocument.isPublic ?? true,
-        } : undefined}
-        onClose={() => {
-          if (!editLoading) setEditingDocument(null);
-        }}
-        onSubmit={handleEditDocument}
-      />
 
       <Dialog open={Boolean(versionDocument)} onOpenChange={(open) => {
         if (!open) {
