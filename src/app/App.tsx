@@ -15,6 +15,7 @@ import { DocumentDetailPage } from './pages/documents/DocumentDetailPage';
 import { PublicDocumentsPage } from './pages/documents/PublicDocumentsPage'; // <-- Import trang mới ở đây
 import { ProfilePage } from './pages/ProfilePage';
 import { ChatPage } from './pages/ChatPage';
+import { PaymentResult } from './pages/PaymentResult';
 import { AdminPage } from './pages/admin/AdminPage';
 import { CategoryPage } from './pages/admin/adminCategory';
 import { SubjectPage } from './pages/admin/SubjectPage';
@@ -101,6 +102,9 @@ export default function App() {
               <Route path="/public-documents" element={<PublicDocumentsPage />} /> {/* <-- Thêm Route xem tài liệu công cộng */}
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/chat" element={<ChatPage />} />
+              <Route path="/payment-status/success" element={<PaymentResult status="success" />} />
+              <Route path="/payment-status/failed" element={<PaymentResult status="failed" />} />
+              <Route path="/payment-result" element={<PaymentResult />} />
             </Route>
           </Route>
 
