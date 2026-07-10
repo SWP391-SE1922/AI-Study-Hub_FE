@@ -541,12 +541,9 @@ export async function getPublicDocuments(params: Record<string, string | number 
   return { documents: result.data, pagination: result.pagination };
 }
 export async function createVnpayPaymentUrl(amount: number, bankCode?: string) {
-  const res = await fetch(`${API_BASE_URL}/api/vnpay/create_payment_url`, {   // ❌ lỗi 1: lặp /api
+  const data = await apiRequest<{ paymentUrl: string }>('/vnpay/create_payment_url', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },                         // ❌ lỗi 2: thiếu Authorization token
     body: JSON.stringify({ amount, bankCode, language: 'vn' }),
   });
-  if (!res.ok) throw new Error('Không thể tạo thanh toán');
-  const data = await res.json();
-  return data.paymentUrl as string;
+  return data.paymentUrl;
 }

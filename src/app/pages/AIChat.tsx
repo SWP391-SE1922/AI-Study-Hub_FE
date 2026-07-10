@@ -1,4 +1,3 @@
-import React from 'react';
 import { MessageSquare, Plus, Trash2, Send, Sparkles, FileText, ArrowRight } from 'lucide-react';
 import { Button } from '../components/ui/button';
 
@@ -9,7 +8,7 @@ export function AIChat() {
       {/* Khung Lịch sử Chat bên trái - Tự động đổi màu nền theo hệ thống */}
       <div className="lg:col-span-1 bg-card border border-border rounded-2xl flex flex-col overflow-hidden shadow-sm">
         <div className="p-4 border-b border-border">
-          <Button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl gap-2 shadow-md">
+          <Button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl gap-2 shadow-lg shadow-blue-500/40 hover:shadow-blue-500/60 transition-all">
             <Plus className="w-4 h-4" />
             Chat mới
           </Button>
@@ -28,7 +27,7 @@ export function AIChat() {
         {/* Chat Header */}
         <div className="p-4 border-b border-border flex items-center justify-between bg-muted/30">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-md">
+            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
@@ -45,7 +44,7 @@ export function AIChat() {
         <div className="flex-1 p-4 overflow-y-auto space-y-6">
           {/* Tin nhắn từ AI */}
           <div className="flex gap-3 max-w-3xl">
-            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white shrink-0 mt-0.5">
+            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white shrink-0 mt-0.5 shadow-md shadow-blue-500/30">
               <Sparkles className="w-4 h-4" />
             </div>
             <div className="space-y-1">
@@ -88,7 +87,7 @@ export function AIChat() {
             />
             <div className="absolute right-2 flex items-center gap-1.5">
               <span className="hidden sm:inline-block text-[10px] font-semibold text-muted-foreground border border-border bg-muted px-1.5 py-0.5 rounded-md">Enter ↵</span>
-              <Button size="icon" className="w-8 h-8 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm">
+              <Button size="icon" className="w-8 h-8 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-md shadow-blue-500/40 hover:shadow-blue-500/60 transition-all">
                 <Send className="w-3.5 h-3.5" />
               </Button>
             </div>

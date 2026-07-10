@@ -7,6 +7,15 @@ import {
   ArrowUpRight,
   ArrowDownRight,
 } from 'lucide-react';
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+} from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
@@ -69,7 +78,6 @@ const transactions = [
     user: 'Nguyễn Văn A',
     plan: 'Gói Premium',
     amount: 1_200_000,
-    status: 'Thành công',
     date: '02/07/2026',
   },
   {
@@ -77,7 +85,6 @@ const transactions = [
     user: 'Trần Thị B',
     plan: 'Gói Standard',
     amount: 420_000,
-    status: 'Thất bại',
     date: '01/07/2026',
   },
   {
@@ -85,7 +92,6 @@ const transactions = [
     user: 'Lê Văn C',
     plan: 'Gói Premium',
     amount: 2_500_000_000,
-    status: 'Thành công',
     date: '30/06/2026',
   },
   {
@@ -93,25 +99,22 @@ const transactions = [
     user: 'Phạm Thị D',
     plan: 'Gói Basic',
     amount: 15_000_000_000,
-    status: 'Chờ xử lý',
     date: '28/06/2026',
   },
 ];
 
-export function AdminFinancePage() {
-  const transactionSummary = useMemo(
-    () => transactions.reduce(
-      (acc, item) => {
-        if (item.status === 'Thành công') acc.success += 1;
-        if (item.status === 'Thất bại') acc.failed += 1;
-        if (item.status === 'Chờ xử lý') acc.pending += 1;
-        return acc;
-      },
-      { success: 0, failed: 0, pending: 0 },
-    ),
-    [],
-  );
+// Doanh thu 7 ngày gần nhất — thay bằng dữ liệu thật khi có API
+const revenueTrend = [
+  { day: '03/07', revenue: 12_500_000 },
+  { day: '04/07', revenue: 15_800_000 },
+  { day: '05/07', revenue: 11_200_000 },
+  { day: '06/07', revenue: 19_400_000 },
+  { day: '07/07', revenue: 17_100_000 },
+  { day: '08/07', revenue: 21_600_000 },
+  { day: '09/07', revenue: 24_300_000 },
+];
 
+export function AdminFinancePage() {
   return (
     <div className="space-y-6 text-slate-900 dark:text-slate-100">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -186,7 +189,6 @@ export function AdminFinancePage() {
                   <TableHead className="py-3 px-4">Người dùng</TableHead>
                   <TableHead className="py-3 px-4">Gói</TableHead>
                   <TableHead className="py-3 px-4">Số tiền</TableHead>
-                  <TableHead className="py-3 px-4">Trạng thái</TableHead>
                   <TableHead className="py-3 px-4">Ngày</TableHead>
                 </TableRow>
               </TableHeader>
@@ -201,11 +203,6 @@ export function AdminFinancePage() {
                         {formatCompactCurrency(transaction.amount)}
                       </span>
                     </TableCell>
-                    <TableCell className="py-3 px-4">
-                      <Badge variant={transaction.status === 'Thành công' ? 'default' : transaction.status === 'Chờ xử lý' ? 'secondary' : 'destructive'}>
-                        {transaction.status}
-                      </Badge>
-                    </TableCell>
                     <TableCell className="py-3 px-4">{transaction.date}</TableCell>
                   </TableRow>
                 ))}
@@ -216,6 +213,7 @@ export function AdminFinancePage() {
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-4">
+        {/* Thay cho khối "Tình trạng thanh toán" cũ: biểu đồ xu hướng doanh thu 7 ngày gần nhất */}
         <Card className={glowCard}>
           <CardHeader>
             <div className="flex items-center gap-3">
@@ -223,31 +221,44 @@ export function AdminFinancePage() {
                 <BarChart3 className="w-5 h-5" />
               </div>
               <div>
-                <CardTitle>Tình trạng thanh toán</CardTitle>
-                <CardDescription>Phân bổ trạng thái giao dịch trong tháng.</CardDescription>
+                <CardTitle>Xu hướng doanh thu</CardTitle>
+                <CardDescription>Doanh thu 7 ngày gần nhất.</CardDescription>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="grid gap-4">
-            <div className="grid grid-cols-3 gap-3">
-              <div className="rounded-2xl border border-border bg-muted/50 p-4 text-center">
-                <p className="text-sm text-muted-foreground">Thành công</p>
-                <p className="text-2xl font-bold text-emerald-600">{transactionSummary.success}</p>
-              </div>
-              <div className="rounded-2xl border border-border bg-muted/50 p-4 text-center">
-                <p className="text-sm text-muted-foreground">Thất bại</p>
-                <p className="text-2xl font-bold text-rose-600">{transactionSummary.failed}</p>
-              </div>
-              <div className="rounded-2xl border border-border bg-muted/50 p-4 text-center">
-                <p className="text-sm text-muted-foreground">Chờ xử lý</p>
-                <p className="text-2xl font-bold text-amber-600">{transactionSummary.pending}</p>
-              </div>
+          <CardContent>
+            <div className="h-56 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={revenueTrend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="revenueFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#6366f1" stopOpacity={0.35} />
+                      <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} className="opacity-20" />
+                  <XAxis dataKey="day" tickLine={false} axisLine={false} fontSize={12} />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    fontSize={12}
+                    tickFormatter={(v) => formatCompactCurrency(v)}
+                    width={70}
+                  />
+                  <Tooltip
+                    formatter={(value: number) => [formatCompactCurrency(value), 'Doanh thu']}
+                    labelFormatter={(label) => `Ngày ${label}`}
+                  />
+                  <Area type="monotone" dataKey="revenue" stroke="#6366f1" strokeWidth={2} fill="url(#revenueFill)" />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
-            <div className="rounded-2xl border border-border bg-slate-100 dark:bg-slate-800 p-4 text-sm text-muted-foreground">
+            <div className="mt-3 rounded-2xl border border-border bg-slate-100 dark:bg-slate-800 p-4 text-sm text-muted-foreground">
               Dữ liệu hiện là mock, TODO: kết nối API tài chính thật để hiển thị doanh thu và giao dịch thực tế.
             </div>
           </CardContent>
         </Card>
+
         <Card className={glowCard}>
           <CardHeader>
             <div className="flex items-center gap-3">
@@ -282,6 +293,7 @@ export function AdminFinancePage() {
           </CardContent>
         </Card>
       </div>
+
     </div>
   );
 }

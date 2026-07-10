@@ -3,13 +3,15 @@ import { Outlet, Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FileText, MessageSquare, Settings, LogOut,
   Menu, X, Sun, Moon, Bot, Shield, Sparkles, Globe,
-  Check, Crown, HardDrive, ChevronRight, ShieldCheck,
+  Check, Crown, HardDrive, ChevronRight, ShieldCheck, Copy, RefreshCw,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
 import { Button } from '../ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
-import { getMe, getToken, logoutLocal, createVnpayPaymentUrl, type User } from '../../services/api';
+import { getMe, getToken, logoutLocal, type User } from '../../services/api';
+// @ts-ignore
+import confetti from 'canvas-confetti';
 
 function readStoredUser(): Partial<User> {
   try {
@@ -27,10 +29,6 @@ function getInitials(name?: string, email?: string) {
 }
 
 // Gói mặc định (free) là 5 GB. Nếu storageLimit lớn hơn, coi như user đã nâng cấp Pro.
-// LƯU Ý ĐƠN VỊ: `storageLimit` từ backend trả về theo BYTE (khớp với Dashboard hiển thị
-// "Tổng: 5.0 GB" / "Đã dùng: 14 MB"), nên phải đổi sang GB trước khi so sánh.
-// Khi backend có field riêng (vd. user.plan / user.isPro), nên dùng thẳng field đó
-// thay vì suy luận từ storageLimit — sẽ chính xác 100% và không phụ thuộc đơn vị.
 const BYTES_PER_GB = 1024 ** 3;
 const FREE_STORAGE_LIMIT_GB = 5;
 
@@ -87,23 +85,50 @@ type UpgradeStep = 'plans' | 'payment';
 function UpgradeModal({ onClose }: { onClose: () => void }) {
   const [step, setStep] = useState<UpgradeStep>('plans');
   const [selected, setSelected] = useState(PLANS[1]);
-  const [paying, setPaying] = useState(false);
 
-  // Gọi API thật của backend: POST /vnpay/create_payment_url
-  const handlePayNow = async () => {
-    setPaying(true);
-    try {
-      // Lưu lại gói đã chọn để trang /payment-result biết hiển thị đúng thông tin
-      localStorage.setItem('pendingPlan', JSON.stringify(selected));
+  const user = readStoredUser();
+  const userIdShort = user?.id ? user.id.slice(-6).toUpperCase() : 'STUDY';
 
-      const paymentUrl = await createVnpayPaymentUrl(selected.price);
-      // Điều hướng thẳng trình duyệt sang cổng thanh toán VNPay
-      window.location.href = paymentUrl;
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Không thể tạo thanh toán, vui lòng thử lại');
-      setPaying(false);
-    }
+  // Sao chép nhanh thông tin chuyển khoản vào bộ nhớ tạm
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`Đã sao chép ${label}`);
   };
+
+  // Tự động kiểm tra trạng thái nâng cấp tài khoản qua API mỗi 4 giây khi đang ở bước thanh toán
+  useEffect(() => {
+    if (step !== 'payment') return;
+
+    let active = true;
+    const interval = setInterval(async () => {
+      if (!active) return;
+      try {
+        const currentUserData = await getMe();
+        const proLabel = getProLabel(currentUserData.storageLimit);
+        if (proLabel) {
+          active = false;
+          clearInterval(interval);
+          localStorage.setItem('user', JSON.stringify(currentUserData));
+          window.dispatchEvent(new Event('authChange'));
+
+          confetti({
+            particleCount: 150,
+            spread: 80,
+            origin: { y: 0.6 }
+          });
+          toast.success(`Chúc mừng! Bạn đã nâng cấp thành công gói ${selected.name}`);
+          onClose();
+        }
+      } catch (err) {
+        // Bỏ qua lỗi kết nối tạm thời khi đang kiểm tra ngầm
+      }
+    }, 4000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [step, selected, onClose]);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -134,7 +159,7 @@ function UpgradeModal({ onClose }: { onClose: () => void }) {
             <div>
               <h2 className="font-extrabold text-slate-900 dark:text-white text-sm">
                 {step === 'plans' && 'Nâng cấp tài khoản Pro'}
-                {step === 'payment' && 'Thanh toán VNPay'}
+                {step === 'payment' && 'Thanh toán tài khoản Pro'}
               </h2>
               <p className="text-[10px] text-slate-400">
                 {step === 'plans' && 'Chọn gói phù hợp với nhu cầu'}
@@ -179,8 +204,8 @@ function UpgradeModal({ onClose }: { onClose: () => void }) {
                   type="button"
                   onClick={() => setSelected(plan)}
                   className={`relative text-left rounded-2xl p-4 border-2 transition-all duration-200 ${selected.id === plan.id
-                      ? `border-transparent ring-2 ${plan.ring} bg-gradient-to-b from-white to-slate-50 dark:from-white/10 dark:to-white/5 shadow-lg`
-                      : 'border-slate-100 dark:border-white/10 hover:border-slate-200 dark:hover:border-white/20 bg-white dark:bg-white/5'
+                    ? `border-transparent ring-2 ${plan.ring} bg-gradient-to-b from-white to-slate-50 dark:from-white/10 dark:to-white/5 shadow-lg`
+                    : 'border-slate-100 dark:border-white/10 hover:border-slate-200 dark:hover:border-white/20 bg-white dark:bg-white/5'
                     }`}
                 >
                   {plan.popular && (
@@ -227,48 +252,130 @@ function UpgradeModal({ onClose }: { onClose: () => void }) {
 
             <p className="text-center text-[11px] text-slate-400 flex items-center justify-center gap-1.5">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-              Bảo mật bởi VNPay · Hủy bất cứ lúc nào
+              Chuyển khoản an toàn · Hệ thống kiểm tra cập nhật liên tục
             </p>
           </div>
         )}
 
-        {/* ── Step 2: Payment (gọi API thật) ────────────────────────────── */}
+        {/* ── Step 2: Payment (Chỉ giữ phần chuyển khoản VietQR) ──────────── */}
         {step === 'payment' && (
           <div className="p-6 space-y-5">
             {/* Order summary */}
             <div className={`rounded-2xl p-4 bg-gradient-to-br ${selected.color} text-white`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-semibold opacity-80">Gói đã chọn</p>
-                  <p className="font-extrabold text-lg">{selected.name}</p>
-                  <p className="text-sm opacity-90">{selected.storage} dung lượng lưu trữ</p>
+                  <p className="text-xs font-semibold opacity-80">Gói nâng cấp</p>
+                  <p className="font-extrabold text-base">{selected.name}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs font-semibold opacity-80">Tổng tiền</p>
-                  <p className="font-extrabold text-2xl">{selected.priceLabel}</p>
-                  <p className="text-xs opacity-80">{selected.period}</p>
+                  <p className="text-xs font-semibold opacity-80">Cần thanh toán</p>
+                  <p className="font-extrabold text-xl">{selected.priceLabel}</p>
                 </div>
               </div>
             </div>
 
-            <div className="rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 p-4 text-sm text-slate-600 dark:text-slate-300">
-              Bấm nút bên dưới để chuyển sang trang thanh toán VNPay. Sau khi hoàn tất
-              giao dịch, hệ thống sẽ tự động đưa bạn quay lại và kích hoạt gói.
+            {/* Grid 2 Columns */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+              {/* Left Column: Bank Account Details */}
+              <div className="space-y-3.5">
+                <h3 className="font-bold text-xs uppercase tracking-wider text-slate-400">
+                  Thông tin chuyển khoản (VietQR)
+                </h3>
+
+                <div className="space-y-2 text-sm">
+                  {/* Ngân hàng */}
+                  <div className="bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-xl p-3 flex justify-between items-center">
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-semibold uppercase">Ngân hàng</p>
+                      <p className="font-bold text-slate-800 dark:text-slate-200">NCB (Ngân hàng Quốc Dân)</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="w-8 h-8 rounded-lg"
+                      onClick={() => copyToClipboard('NCB', 'Ngân hàng')}
+                      title="Sao chép tên ngân hàng"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+
+                  {/* Số tài khoản */}
+                  <div className="bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-xl p-3 flex justify-between items-center">
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-semibold uppercase">Số tài khoản</p>
+                      <p className="font-bold text-slate-800 dark:text-slate-200 font-mono tracking-wider">9704198524025937</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="w-8 h-8 rounded-lg"
+                      onClick={() => copyToClipboard('9704198524025937', 'Số tài khoản')}
+                      title="Sao chép số tài khoản"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+
+                  {/* Chủ tài khoản */}
+                  <div className="bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-xl p-3 flex justify-between items-center">
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-semibold uppercase">Chủ tài khoản</p>
+                      <p className="font-bold text-slate-800 dark:text-slate-200">AI STUDY HUB</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="w-8 h-8 rounded-lg"
+                      onClick={() => copyToClipboard('AI STUDY HUB', 'Chủ tài khoản')}
+                      title="Sao chép tên chủ tài khoản"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+
+                  {/* Nội dung chuyển khoản */}
+                  <div className="bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-xl p-3 flex justify-between items-center ring-1 ring-indigo-500/30">
+                    <div>
+                      <p className="text-[10px] text-indigo-500 font-semibold uppercase">Nội dung bắt buộc</p>
+                      <p className="font-extrabold text-indigo-600 dark:text-indigo-400 font-mono tracking-wide text-base">
+                        {`STUDYHUB PRO ${userIdShort}`}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="w-8 h-8 rounded-lg text-indigo-500 hover:text-indigo-600"
+                      onClick={() => copyToClipboard(`STUDYHUB PRO ${userIdShort}`, 'Nội dung chuyển khoản')}
+                      title="Sao chép nội dung"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: QR Code */}
+              <div className="flex flex-col items-center justify-center p-4 border border-slate-100 dark:border-white/10 rounded-2xl bg-slate-50/50 dark:bg-white/[0.02] h-full">
+                <div className="relative bg-white p-3 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center">
+                  <img
+                    src={`https://img.vietqr.io/image/NCB-9704198524025937-compact.png?amount=${selected.price}&addInfo=STUDYHUB%20PRO%20${userIdShort}&accountName=AI%20STUDY%20HUB`}
+                    alt="VietQR Code"
+                    className="w-36 h-36 object-contain"
+                  />
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 bg-white rounded-lg flex items-center justify-center shadow-md">
+                    <Crown className="w-4 h-4 text-indigo-500" />
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-3 text-center leading-relaxed font-medium">
+                  Quét mã VietQR bằng ứng dụng Mobile Banking để thanh toán nhanh.
+                </p>
+                <div className="flex items-center gap-1.5 mt-2.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-3 py-1 rounded-full text-[9px] font-extrabold tracking-wide uppercase">
+                  <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                  Hệ thống đang kiểm tra tự động...
+                </div>
+              </div>
             </div>
-
-            <Button
-              onClick={handlePayNow}
-              disabled={paying}
-              className="w-full h-12 bg-gradient-to-r from-indigo-500 to-fuchsia-500 hover:from-indigo-600 hover:to-fuchsia-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/25 hover:-translate-y-0.5 transition-all disabled:opacity-60 disabled:hover:translate-y-0"
-            >
-              {paying ? 'Đang tạo thanh toán...' : 'Thanh toán qua VNPay'}
-              {!paying && <ChevronRight className="w-4 h-4 ml-1" />}
-            </Button>
-
-            <p className="text-center text-[11px] text-slate-400 flex items-center justify-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-              Bảo mật bởi VNPay · Hủy bất cứ lúc nào
-            </p>
           </div>
         )}
       </div>
@@ -441,8 +548,8 @@ export function MainLayout() {
             <div className="relative">
               <Avatar
                 className={`w-9 h-9 ring-2 ring-offset-2 ring-offset-white dark:ring-offset-[#0B0A1A] transition-shadow duration-300 ${isPro
-                    ? 'ring-amber-400/60 hover:shadow-[0_0_18px_-2px_rgba(251,191,36,0.7)]'
-                    : 'ring-indigo-500/30 hover:shadow-[0_0_18px_-2px_rgba(139,92,246,0.6)]'
+                  ? 'ring-amber-400/60 hover:shadow-[0_0_18px_-2px_rgba(251,191,36,0.7)]'
+                  : 'ring-indigo-500/30 hover:shadow-[0_0_18px_-2px_rgba(139,92,246,0.6)]'
                   }`}
               >
                 <AvatarImage src={currentUser.avatarUrl || ''} alt={currentUser.fullName || currentUser.email} />
