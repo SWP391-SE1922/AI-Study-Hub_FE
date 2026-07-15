@@ -115,7 +115,54 @@ export type ChatMessage = {
   content: string;
   createdAt: string;
 };
+export type SubscriptionPlan = {
+  id: string;
+  name: string;
+  code: string;
+  price: number;
+  storageLimit: number;
+  dailyChatLimit: number;
+  durationDays: number;
+  description?: string | null;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
 
+export type UserSubscription = {
+  id: string;
+  userId: string;
+  planId: string;
+  status: 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'SUSPENDED' | string;
+  startDate: string;
+  expireDate: string;
+  createdAt?: string;
+  updatedAt?: string;
+  plan: SubscriptionPlan;
+};
+
+export type CreateVnpayPaymentResult = {
+  success: boolean;
+  message: string;
+  paymentUrl: string;
+  transactionId: string;
+};
+export type BankTransferPaymentResult = {
+  transaction: {
+    id: string;
+    status: string;
+    amount: number;
+    paymentCode: string;
+  };
+  bank: {
+    bankId: string;
+    bankName: string;
+    accountNo: string;
+    accountName: string;
+  };
+  transferContent: string;
+  qrUrl: string;
+};
 export function getToken() {
   return localStorage.getItem('authToken');
 }
@@ -540,10 +587,108 @@ export async function getPublicDocuments(params: Record<string, string | number 
   const result = await request<ApiResponse<DocumentItem[]>>(`/documents${query ? `?${query}` : ''}`);
   return { documents: result.data, pagination: result.pagination };
 }
-export async function createVnpayPaymentUrl(amount: number, bankCode?: string) {
-  const data = await apiRequest<{ paymentUrl: string }>('/vnpay/create_payment_url', {
+// ==================== SUBSCRIPTION ====================
+
+export async function getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
+  const result = await request<
+    ApiResponse<{ plans: SubscriptionPlan[] }> |
+    { success: boolean; message: string; data?: { plans?: SubscriptionPlan[] }; plans?: SubscriptionPlan[] }
+  >('/subscriptions/plans');
+
+  const payload = result as any;
+
+  if (Array.isArray(payload?.data?.plans)) {
+    return payload.data.plans;
+  }
+
+  if (Array.isArray(payload?.plans)) {
+    return payload.plans;
+  }
+
+  if (Array.isArray(payload?.data)) {
+    return payload.data;
+  }
+
+  return [];
+}
+
+export async function getCurrentSubscription(): Promise<UserSubscription | null> {
+  const result = await request<
+    ApiResponse<{ subscription: UserSubscription | null }> |
+    {
+      success: boolean;
+      message: string;
+      data?: {
+        subscription?: UserSubscription | null;
+      };
+      subscription?: UserSubscription | null;
+    }
+  >('/subscriptions/current');
+
+  const payload = result as any;
+
+  return (
+    payload?.data?.subscription ??
+    payload?.subscription ??
+    null
+  );
+}
+
+// ==================== VNPAY ====================
+
+export async function createBankTransferPayment(
+  planId: string
+): Promise<BankTransferPaymentResult> {
+  if (!planId) {
+    throw new Error('Vui lòng chọn gói nâng cấp');
+  }
+
+  const result = await request<
+    ApiResponse<BankTransferPaymentResult>
+  >('/bank-transfer/create', {
     method: 'POST',
-    body: JSON.stringify({ amount, bankCode, language: 'vn' }),
+    body: JSON.stringify({
+      planId,
+    }),
   });
-  return data.paymentUrl;
+
+  return result.data;
+}
+
+export async function confirmBankTransfer(
+  transactionId: string
+) {
+  if (!transactionId) {
+    throw new Error('Thiếu mã giao dịch');
+  }
+
+  const result = await request<
+    ApiResponse<{
+      transaction: {
+        id: string;
+        status: string;
+      };
+    }>
+  >(`/bank-transfer/${transactionId}/confirm`, {
+    method: 'PATCH',
+  });
+
+  return result.data.transaction;
+}
+export async function getAllTransactions() {
+  const result = await request<ApiResponse<{
+    transactions: any[];
+  }>>('/transactions/all');
+
+  return result.data.transactions;
+}
+
+export async function approveTransaction(id: string) {
+  const result = await request<
+    ApiResponse<any>
+  >(`/transactions/${id}/approve`, {
+    method: 'PATCH',
+  });
+
+  return result.data;
 }

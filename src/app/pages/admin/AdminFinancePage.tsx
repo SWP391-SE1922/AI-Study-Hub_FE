@@ -1,32 +1,61 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  LayoutDashboard,
-  HardDrive,
-  CreditCard,
-  Receipt,
-  Wallet,
   ArrowLeftRight,
-  Crown,
-  Eye,
-  Plus,
-  Edit,
-  Trash2,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  CreditCard,
+  Crown,
+  Eye,
+  HardDrive,
+  LayoutDashboard,
+  Loader2,
+  Receipt,
+  RefreshCw,
+  Search,
+  Wallet,
 } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
-import { Badge } from '../../components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
-import { Textarea } from '../../components/ui/textarea';
-import { Switch } from '../../components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../components/ui/dialog';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../../components/ui/sheet';
+import { toast } from 'sonner';
 
-// Shadow dùng chung cho các card — giống hệt AdminPage.tsx / adminCategory.tsx, không tạo màu mới.
+import {
+  approveTransaction,
+  getAllTransactions,
+  getSubscriptionPlans,
+  type SubscriptionPlan,
+} from '../../services/api';
+
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '../../components/ui/card';
+import { Badge } from '../../components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../../components/ui/table';
+import { Button } from '../../components/ui/button';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '../../components/ui/tabs';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../../components/ui/dialog';
+
 const glowCard =
   'border-sky-500/10 dark:border-sky-400/10 bg-white dark:bg-slate-900 ' +
   'shadow-[0_0_0_1px_rgba(56,189,248,0.06),0_8px_30px_-8px_rgba(56,189,248,0.35)] ' +
@@ -35,50 +64,144 @@ const glowCard =
   'dark:hover:shadow-[0_0_0_1px_rgba(56,189,248,0.18),0_12px_45px_-8px_rgba(56,189,248,0.45)] ' +
   'transition-shadow duration-300';
 
-// Luôn hiển thị số tiền đầy đủ, rõ ràng (VD: 249.000.000đ) — không rút gọn thành "triệu/tỷ".
-function formatCurrency(value: number): string {
-  return `${value.toLocaleString('vi-VN')}đ`;
+type TransactionStatus =
+  | 'PENDING'
+  | 'WAITING_CONFIRMATION'
+  | 'PROCESSING'
+  | 'SUCCESS'
+  | 'FAILED'
+  | 'CANCELLED'
+  | string;
+
+type TransactionUser = {
+  id: string;
+  email?: string;
+  fullName?: string;
+};
+
+type TransactionPlan = {
+  id: string;
+  name: string;
+  code?: string;
+  price?: number;
+  storageLimit?: number;
+  dailyChatLimit?: number;
+  durationDays?: number;
+};
+
+type TransactionItem = {
+  id: string;
+  amount: number | string;
+  status: TransactionStatus;
+  paymentMethod?: string;
+  description?: string | null;
+  orderInfo?: string | null;
+  transactionNo?: string | null;
+  bankCode?: string | null;
+  responseCode?: string | null;
+  paidAt?: string | null;
+  createdAt: string;
+  updatedAt?: string;
+  user?: TransactionUser | null;
+  plan?: TransactionPlan | null;
+};
+
+type InvoiceItem = {
+  id: string;
+  code: string;
+  user: string;
+  plan: string;
+  method: string;
+  amount: number;
+  createdAt: string;
+  status: 'PAID';
+};
+
+type RevenuePoint = {
+  key: string;
+  label: string;
+  value: number;
+};
+
+const PAYMENT_PAGE_SIZE = 6;
+const PLAN_PAGE_SIZE = 6;
+const INVOICE_PAGE_SIZE = 6;
+
+function formatCurrency(value: number | string | null | undefined): string {
+  const amount = Number(value || 0);
+  return `${amount.toLocaleString('vi-VN')}đ`;
 }
 
-function normalizeSearchText(value: string) {
-  return value
+function formatDate(value?: string | null): string {
+  if (!value) return '—';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+
+  return new Intl.DateTimeFormat('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
+function normalizeSearchText(value?: string | null): string {
+  return (value || '')
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '')
     .toLowerCase()
     .trim();
 }
 
-/* ========================================================================
- * Biểu đồ đường doanh thu — copy nguyên logic vẽ SVG từ LineTrendChart
- * đang có trong AdminPage.tsx (không tách file riêng theo yêu cầu).
- * ==================================================================== */
-type LineChartPoint = { key: string; label: string; value: number; note?: string };
+function bytesToGb(value?: number): string {
+  const bytes = Number(value || 0);
+  return `${Math.round((bytes / 1024 ** 3) * 100) / 100} GB`;
+}
 
-function RevenueLineChart({ data }: { data: LineChartPoint[] }) {
+function getTransactionCode(transaction: TransactionItem): string {
+  return (
+    transaction.orderInfo ||
+    transaction.transactionNo ||
+    transaction.id.slice(0, 12).toUpperCase()
+  );
+}
+
+function RevenueLineChart({ data }: { data: RevenuePoint[] }) {
   const chartWidth = 640;
   const chartHeight = 230;
-  // paddingX rộng hơn bản gốc (34) vì trục Y ở đây hiển thị số tiền đầy đủ
-  // (VD: "60.000.000") thay vì số đếm ngắn (VD: "12") — cần thêm chỗ để nhãn
-  // không đè lên đường biểu đồ, giữ đúng cách canh chỉnh chuẩn như LineTrendChart gốc.
   const paddingX = 86;
   const paddingY = 26;
   const innerWidth = chartWidth - paddingX * 2;
   const innerHeight = chartHeight - paddingY * 2;
-  const maxValue = Math.max(...data.map((item) => Number(item.value || 0)), 1);
+  const maxValue = Math.max(...data.map((item) => item.value), 1);
+
   const points = data.map((item, index) => {
-    const x = paddingX + (data.length <= 1 ? innerWidth / 2 : (index * innerWidth) / (data.length - 1));
-    const y = paddingY + innerHeight - (Number(item.value || 0) / maxValue) * innerHeight;
+    const x =
+      paddingX +
+      (data.length <= 1
+        ? innerWidth / 2
+        : (index * innerWidth) / (data.length - 1));
+
+    const y =
+      paddingY +
+      innerHeight -
+      (Number(item.value || 0) / maxValue) * innerHeight;
+
     return { ...item, x, y };
   });
+
   const linePoints = points.map((point) => `${point.x},${point.y}`).join(' ');
   const areaPoints = points.length
-    ? `${paddingX},${chartHeight - paddingY} ${linePoints} ${chartWidth - paddingX},${chartHeight - paddingY}`
+    ? `${paddingX},${chartHeight - paddingY} ${linePoints} ${chartWidth - paddingX
+    },${chartHeight - paddingY}`
     : '';
 
-  if (!data.length) {
+  if (!data.length || data.every((item) => item.value === 0)) {
     return (
       <div className="rounded-2xl border border-dashed border-border bg-muted/20 py-14 text-center text-muted-foreground">
-        Chưa có dữ liệu doanh thu để vẽ biểu đồ.
+        Chưa có giao dịch thành công để vẽ biểu đồ doanh thu.
       </div>
     );
   }
@@ -89,13 +212,31 @@ function RevenueLineChart({ data }: { data: LineChartPoint[] }) {
         <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           Đơn vị: VNĐ
         </p>
-        <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="h-64 w-full overflow-visible" role="img">
+
+        <svg
+          viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+          className="h-64 w-full overflow-visible"
+          role="img"
+        >
           <defs>
-            <linearGradient id="finance-revenue-line" x1="0" y1="0" x2="1" y2="0">
+            <linearGradient
+              id="finance-revenue-line"
+              x1="0"
+              y1="0"
+              x2="1"
+              y2="0"
+            >
               <stop offset="0%" stopColor="#0ea5e9" />
               <stop offset="100%" stopColor="#9333ea" />
             </linearGradient>
-            <linearGradient id="finance-revenue-area" x1="0" y1="0" x2="0" y2="1">
+
+            <linearGradient
+              id="finance-revenue-area"
+              x1="0"
+              y1="0"
+              x2="0"
+              y2="1"
+            >
               <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.24" />
               <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.02" />
             </linearGradient>
@@ -103,7 +244,10 @@ function RevenueLineChart({ data }: { data: LineChartPoint[] }) {
 
           {[0, 1, 2, 3].map((line) => {
             const y = paddingY + (line * innerHeight) / 3;
-            const labelValue = Math.round((maxValue - (line * maxValue) / 3) / 1_000_000) * 1_000_000;
+            const labelValue = Math.round(
+              maxValue - (line * maxValue) / 3,
+            );
+
             return (
               <g key={line}>
                 <line
@@ -114,7 +258,12 @@ function RevenueLineChart({ data }: { data: LineChartPoint[] }) {
                   className="stroke-border"
                   strokeDasharray="5 8"
                 />
-                <text x={paddingX - 40} y={y + 4} textAnchor="end" className="fill-muted-foreground text-[10px]">
+                <text
+                  x={paddingX - 14}
+                  y={y + 4}
+                  textAnchor="end"
+                  className="fill-muted-foreground text-[10px]"
+                >
                   {labelValue.toLocaleString('vi-VN')}
                 </text>
               </g>
@@ -122,6 +271,7 @@ function RevenueLineChart({ data }: { data: LineChartPoint[] }) {
           })}
 
           <polygon points={areaPoints} fill="url(#finance-revenue-area)" />
+
           <polyline
             points={linePoints}
             fill="none"
@@ -133,9 +283,21 @@ function RevenueLineChart({ data }: { data: LineChartPoint[] }) {
 
           {points.map((point) => (
             <g key={point.key}>
-              <circle cx={point.x} cy={point.y} r="7" className="fill-background" stroke="url(#finance-revenue-line)" strokeWidth="4" />
+              <circle
+                cx={point.x}
+                cy={point.y}
+                r="7"
+                className="fill-background"
+                stroke="url(#finance-revenue-line)"
+                strokeWidth="4"
+              />
               <circle cx={point.x} cy={point.y} r="3" fill="#0ea5e9" />
-              <text x={point.x} y={point.y - 14} textAnchor="middle" className="fill-foreground text-[11px] font-semibold">
+              <text
+                x={point.x}
+                y={point.y - 14}
+                textAnchor="middle"
+                className="fill-foreground text-[11px] font-semibold"
+              >
                 {formatCurrency(point.value)}
               </text>
             </g>
@@ -145,9 +307,14 @@ function RevenueLineChart({ data }: { data: LineChartPoint[] }) {
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         {points.map((point) => (
-          <div key={point.key} className="rounded-xl border border-border bg-muted/20 p-2 text-center">
+          <div
+            key={point.key}
+            className="rounded-xl border border-border bg-muted/20 p-2 text-center"
+          >
             <p className="truncate text-xs font-medium">{point.label}</p>
-            <p className="mt-1 text-sm font-bold text-sky-500">{formatCurrency(point.value)}</p>
+            <p className="mt-1 text-sm font-bold text-sky-500">
+              {formatCurrency(point.value)}
+            </p>
           </div>
         ))}
       </div>
@@ -155,314 +322,452 @@ function RevenueLineChart({ data }: { data: LineChartPoint[] }) {
   );
 }
 
-/* ========================================================================
- * Types
- * ==================================================================== */
-type BadgeColor = 'default' | 'secondary' | 'outline' | 'destructive';
-type PaymentMethod = 'VNPay' | 'MoMo QR';
+function TransactionStatusBadge({ status }: { status: TransactionStatus }) {
+  switch (status) {
+    case 'SUCCESS':
+      return (
+        <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">
+          Thành công
+        </Badge>
+      );
 
-interface StoragePlan {
-  id: string;
-  name: string;
-  price: number;
-  storage: string;
-  cycle: string;
-  badgeColor: BadgeColor;
-  status: 'active' | 'inactive';
-  permissions: string[];
+    case 'WAITING_CONFIRMATION':
+      return (
+        <Badge className="bg-amber-500 text-white hover:bg-amber-500">
+          Chờ Admin duyệt
+        </Badge>
+      );
+
+    case 'PROCESSING':
+      return (
+        <Badge className="bg-sky-600 text-white hover:bg-sky-600">
+          Đang xử lý
+        </Badge>
+      );
+
+    case 'PENDING':
+      return <Badge variant="secondary">Chờ chuyển khoản</Badge>;
+
+    case 'FAILED':
+      return <Badge variant="destructive">Thất bại</Badge>;
+
+    case 'CANCELLED':
+      return <Badge variant="outline">Đã hủy</Badge>;
+
+    default:
+      return <Badge variant="outline">{status || 'UNKNOWN'}</Badge>;
+  }
 }
-
-interface PaymentTransaction {
-  id: string;
-  code: string;
-  user: string;
-  plan: string;
-  method: PaymentMethod;
-  amount: number;
-  paidAt: string;
-  status: 'success' | 'failed' | 'pending';
-}
-
-interface InvoiceRecord {
-  id: string;
-  code: string;
-  user: string;
-  plan: string;
-  method: PaymentMethod;
-  amount: number;
-  createdAt: string;
-  status: 'paid' | 'unpaid' | 'cancelled';
-}
-
-/* ========================================================================
- * Mock data — TODO: thay bằng API thật khi backend sẵn sàng
- * ==================================================================== */
-const revenueTrend: LineChartPoint[] = [
-  { key: '01', label: 'T1', value: 32_000_000 },
-  { key: '02', label: 'T2', value: 41_500_000 },
-  { key: '03', label: 'T3', value: 38_200_000 },
-  { key: '04', label: 'T4', value: 52_800_000 },
-  { key: '05', label: 'T5', value: 61_000_000 },
-  { key: '06', label: 'T6', value: 56_200_000 },
-];
-
-const topPlans = [
-  { name: 'Premium 1 tháng', sold: 214 },
-  { name: 'Premium 1 năm', sold: 128 },
-  { name: 'Premium 3 tháng', sold: 96 },
-  { name: 'Free', sold: 412 },
-];
-
-const paymentMethodStats: { method: PaymentMethod; count: number }[] = [
-  { method: 'VNPay', count: 245 },
-  { method: 'MoMo QR', count: 168 },
-];
-
-const initialPlans: StoragePlan[] = [
-  {
-    id: 'PLAN-001',
-    name: 'Free',
-    price: 0,
-    storage: '2 GB',
-    cycle: 'Không giới hạn',
-    badgeColor: 'secondary',
-    status: 'active',
-    permissions: ['Truy cập tài liệu cơ bản', 'Giới hạn 10 lượt chat AI/ngày'],
-  },
-  {
-    id: 'PLAN-002',
-    name: 'Premium 1 tháng',
-    price: 99_000,
-    storage: '50 GB',
-    cycle: '30 ngày',
-    badgeColor: 'default',
-    status: 'active',
-    permissions: ['Truy cập đầy đủ tài liệu', 'Chat AI không giới hạn', 'Ưu tiên hỗ trợ'],
-  },
-  {
-    id: 'PLAN-003',
-    name: 'Premium 3 tháng',
-    price: 199_000,
-    storage: '100 GB',
-    cycle: '90 ngày',
-    badgeColor: 'default',
-    status: 'active',
-    permissions: ['Truy cập đầy đủ tài liệu', 'Chat AI không giới hạn', 'Ưu tiên hỗ trợ'],
-  },
-  {
-    id: 'PLAN-004',
-    name: 'Premium 1 năm',
-    price: 899_000,
-    storage: '200 GB',
-    cycle: '365 ngày',
-    badgeColor: 'outline',
-    status: 'inactive',
-    permissions: ['Truy cập đầy đủ tài liệu', 'Chat AI không giới hạn', 'Ưu tiên hỗ trợ', 'Huy hiệu VIP'],
-  },
-];
-
-const initialPayments: PaymentTransaction[] = [
-  { id: 'TXN-001', code: 'TXN250706001', user: 'nguyen.vana@example.com', plan: 'Premium 1 tháng', method: 'VNPay', amount: 99_000, paidAt: '06/07/2026 10:30', status: 'success' },
-  { id: 'TXN-002', code: 'TXN250706002', user: 'tran.thib@example.com', plan: 'Premium 3 tháng', method: 'MoMo QR', amount: 199_000, paidAt: '06/07/2026 10:25', status: 'success' },
-  { id: 'TXN-003', code: 'TXN250706003', user: 'le.vanc@example.com', plan: 'Premium 1 tháng', method: 'VNPay', amount: 99_000, paidAt: '06/07/2026 10:15', status: 'failed' },
-  { id: 'TXN-004', code: 'TXN250706004', user: 'pham.td@example.com', plan: 'Premium 1 năm', method: 'MoMo QR', amount: 899_000, paidAt: '06/07/2026 10:05', status: 'success' },
-  { id: 'TXN-005', code: 'TXN250706005', user: 'hoang.ma@example.com', plan: 'Premium 1 tháng', method: 'VNPay', amount: 99_000, paidAt: '06/07/2026 09:58', status: 'pending' },
-  { id: 'TXN-006', code: 'TXN250706006', user: 'do.minh@example.com', plan: 'Premium 3 tháng', method: 'MoMo QR', amount: 199_000, paidAt: '06/07/2026 09:40', status: 'success' },
-];
-
-const initialInvoices: InvoiceRecord[] = [
-  { id: 'INV-001', code: 'HD250706001', user: 'nguyen.vana@example.com', plan: 'Premium 1 tháng', method: 'VNPay', amount: 99_000, createdAt: '06/07/2026', status: 'paid' },
-  { id: 'INV-002', code: 'HD250706002', user: 'tran.thib@example.com', plan: 'Premium 3 tháng', method: 'MoMo QR', amount: 199_000, createdAt: '06/07/2026', status: 'paid' },
-  { id: 'INV-003', code: 'HD250706003', user: 'le.vanc@example.com', plan: 'Premium 1 tháng', method: 'VNPay', amount: 99_000, createdAt: '06/07/2026', status: 'unpaid' },
-  { id: 'INV-004', code: 'HD250706004', user: 'pham.td@example.com', plan: 'Premium 1 năm', method: 'MoMo QR', amount: 899_000, createdAt: '05/07/2026', status: 'paid' },
-  { id: 'INV-005', code: 'HD250706005', user: 'hoang.ma@example.com', plan: 'Premium 1 tháng', method: 'VNPay', amount: 99_000, createdAt: '05/07/2026', status: 'cancelled' },
-];
-
-const PLAN_PAGE_SIZE = 5;
-const PAYMENT_PAGE_SIZE = 5;
-const INVOICE_PAGE_SIZE = 5;
-
-const emptyPlanForm = {
-  name: '',
-  price: '',
-  storage: '',
-  cycle: '',
-  badgeColor: 'default' as BadgeColor,
-  status: true,
-  permissionsText: '',
-};
 
 export function AdminFinancePage() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'storage' | 'payment' | 'invoice'>('dashboard');
+  const [activeTab, setActiveTab] = useState<
+    'dashboard' | 'storage' | 'payment' | 'invoice'
+  >('dashboard');
 
-  /* ------------------------------- Dashboard ------------------------------- */
-  const totalRevenue = useMemo(() => revenueTrend.reduce((sum, item) => sum + item.value, 0), []);
-  const totalTransactions = initialPayments.length;
-  const successPayments = initialPayments.filter((p) => p.status === 'success').length;
-  const proUsers = 128;
+  const [transactions, setTransactions] = useState<TransactionItem[]>([]);
+  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [viewingPayment, setViewingPayment] =
+    useState<TransactionItem | null>(null);
 
-  const dashboardStats = [
-    { title: 'Tổng doanh thu', value: formatCurrency(totalRevenue), icon: Wallet, description: '6 tháng gần nhất' },
-    { title: 'Tổng giao dịch', value: totalTransactions.toLocaleString('vi-VN'), icon: ArrowLeftRight, description: 'Trong hệ thống' },
-    { title: 'Tổng thanh toán', value: successPayments.toLocaleString('vi-VN'), icon: CreditCard, description: 'Giao dịch thành công' },
-    { title: 'Người dùng Pro', value: proUsers.toLocaleString('vi-VN'), icon: Crown, description: 'Đang dùng gói trả phí' },
-  ];
-
-  const totalPaymentCount = paymentMethodStats.reduce((sum, item) => sum + item.count, 0);
-
-  /* ------------------------------- Gói lưu trữ ------------------------------- */
-  const [plans, setPlans] = useState<StoragePlan[]>(initialPlans);
-  const [planSearch, setPlanSearch] = useState('');
-  const [planPage, setPlanPage] = useState(1);
-  const [planDialogOpen, setPlanDialogOpen] = useState(false);
-  const [editingPlan, setEditingPlan] = useState<StoragePlan | null>(null);
-  const [planForm, setPlanForm] = useState(emptyPlanForm);
-
-  const filteredPlans = useMemo(
-    () => plans.filter((p) => normalizeSearchText(p.name).includes(normalizeSearchText(planSearch))),
-    [plans, planSearch],
-  );
-  const totalPlanPages = Math.max(1, Math.ceil(filteredPlans.length / PLAN_PAGE_SIZE));
-  const paginatedPlans = filteredPlans.slice((planPage - 1) * PLAN_PAGE_SIZE, planPage * PLAN_PAGE_SIZE);
-
-  const openAddPlanDialog = () => {
-    setEditingPlan(null);
-    setPlanForm(emptyPlanForm);
-    setPlanDialogOpen(true);
-  };
-
-  const openEditPlanDialog = (plan: StoragePlan) => {
-    setEditingPlan(plan);
-    setPlanForm({
-      name: plan.name,
-      price: String(plan.price),
-      storage: plan.storage,
-      cycle: plan.cycle,
-      badgeColor: plan.badgeColor,
-      status: plan.status === 'active',
-      permissionsText: plan.permissions.join('\n'),
-    });
-    setPlanDialogOpen(true);
-  };
-
-  const handleSubmitPlan = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!planForm.name.trim()) return;
-
-    const payload: StoragePlan = {
-      id: editingPlan ? editingPlan.id : `PLAN-${Date.now()}`,
-      name: planForm.name.trim(),
-      price: Number(planForm.price) || 0,
-      storage: planForm.storage.trim(),
-      cycle: planForm.cycle.trim(),
-      badgeColor: planForm.badgeColor,
-      status: planForm.status ? 'active' : 'inactive',
-      permissions: planForm.permissionsText.split('\n').map((s) => s.trim()).filter(Boolean),
-    };
-
-    // TODO: gọi API POST /admin/finance/plans (thêm) hoặc PUT /admin/finance/plans/:id (sửa)
-    if (editingPlan) {
-      setPlans((prev) => prev.map((p) => (p.id === editingPlan.id ? payload : p)));
-    } else {
-      setPlans((prev) => [payload, ...prev]);
-    }
-    setPlanDialogOpen(false);
-  };
-
-  const handleDeletePlan = (id: string) => {
-    // TODO: gọi API DELETE /admin/finance/plans/:id
-    if (confirm('Bạn có chắc muốn xóa gói này?')) {
-      setPlans((prev) => prev.filter((p) => p.id !== id));
-    }
-  };
-
-  /* ------------------------------- Thanh toán ------------------------------- */
   const [paymentSearch, setPaymentSearch] = useState('');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState('');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
   const [paymentPage, setPaymentPage] = useState(1);
-  const [viewingPayment, setViewingPayment] = useState<PaymentTransaction | null>(null);
 
-  const filteredPayments = useMemo(() => {
+  const [planSearch, setPlanSearch] = useState('');
+  const [planPage, setPlanPage] = useState(1);
+
+  const [invoiceSearch, setInvoiceSearch] = useState('');
+  const [invoicePage, setInvoicePage] = useState(1);
+
+  const loadFinanceData = useCallback(async (showRefreshToast = false) => {
+    try {
+      if (showRefreshToast) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
+      const [transactionData, planData] = await Promise.all([
+        getAllTransactions(),
+        getSubscriptionPlans(),
+      ]);
+
+      setTransactions(
+        Array.isArray(transactionData) ? transactionData : [],
+      );
+      setPlans(Array.isArray(planData) ? planData : []);
+
+      if (showRefreshToast) {
+        toast.success('Đã tải lại dữ liệu tài chính');
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Không thể tải dữ liệu tài chính';
+
+      toast.error(message);
+      console.error(error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadFinanceData();
+  }, [loadFinanceData]);
+
+  const successfulTransactions = useMemo(
+    () => transactions.filter((item) => item.status === 'SUCCESS'),
+    [transactions],
+  );
+
+  const totalRevenue = useMemo(
+    () =>
+      successfulTransactions.reduce(
+        (sum, item) => sum + Number(item.amount || 0),
+        0,
+      ),
+    [successfulTransactions],
+  );
+
+  const waitingCount = useMemo(
+    () =>
+      transactions.filter(
+        (item) => item.status === 'WAITING_CONFIRMATION',
+      ).length,
+    [transactions],
+  );
+
+  const proUsers = useMemo(
+    () =>
+      new Set(
+        successfulTransactions
+          .map((item) => item.user?.id)
+          .filter(Boolean),
+      ).size,
+    [successfulTransactions],
+  );
+
+  const revenueTrend = useMemo<RevenuePoint[]>(() => {
+    const now = new Date();
+
+    return Array.from({ length: 6 }, (_, index) => {
+      const date = new Date(
+        now.getFullYear(),
+        now.getMonth() - (5 - index),
+        1,
+      );
+
+      const month = date.getMonth();
+      const year = date.getFullYear();
+
+      const value = successfulTransactions
+        .filter((transaction) => {
+          const source = transaction.paidAt || transaction.createdAt;
+          const transactionDate = new Date(source);
+
+          return (
+            transactionDate.getMonth() === month &&
+            transactionDate.getFullYear() === year
+          );
+        })
+        .reduce(
+          (sum, transaction) => sum + Number(transaction.amount || 0),
+          0,
+        );
+
+      return {
+        key: `${year}-${month + 1}`,
+        label: `T${month + 1}`,
+        value,
+      };
+    });
+  }, [successfulTransactions]);
+
+  const topPlans = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    successfulTransactions.forEach((transaction) => {
+      const planName = transaction.plan?.name || 'Không xác định';
+      counts.set(planName, (counts.get(planName) || 0) + 1);
+    });
+
+    return Array.from(counts.entries())
+      .map(([name, sold]) => ({ name, sold }))
+      .sort((a, b) => b.sold - a.sold)
+      .slice(0, 5);
+  }, [successfulTransactions]);
+
+  const paymentMethodStats = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    transactions.forEach((transaction) => {
+      const method = transaction.paymentMethod || 'Không xác định';
+      counts.set(method, (counts.get(method) || 0) + 1);
+    });
+
+    return Array.from(counts.entries())
+      .map(([method, count]) => ({ method, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [transactions]);
+
+  const totalPaymentCount = transactions.length;
+
+  const dashboardStats = [
+    {
+      title: 'Tổng doanh thu',
+      value: formatCurrency(totalRevenue),
+      icon: Wallet,
+      description: 'Giao dịch đã thành công',
+    },
+    {
+      title: 'Tổng giao dịch',
+      value: transactions.length.toLocaleString('vi-VN'),
+      icon: ArrowLeftRight,
+      description: 'Trong hệ thống',
+    },
+    {
+      title: 'Chờ duyệt',
+      value: waitingCount.toLocaleString('vi-VN'),
+      icon: CreditCard,
+      description: 'Cần Admin kiểm tra',
+    },
+    {
+      title: 'Người dùng Pro',
+      value: proUsers.toLocaleString('vi-VN'),
+      icon: Crown,
+      description: 'Đã thanh toán thành công',
+    },
+  ];
+
+  const filteredTransactions = useMemo(() => {
     const search = normalizeSearchText(paymentSearch);
-    return initialPayments.filter((p) => {
-      const matchesSearch = !search || normalizeSearchText(p.code).includes(search) || normalizeSearchText(p.user).includes(search);
-      const matchesMethod = !paymentMethodFilter || p.method === paymentMethodFilter;
-      const matchesStatus = !paymentStatusFilter || p.status === paymentStatusFilter;
+
+    return transactions.filter((transaction) => {
+      const code = getTransactionCode(transaction);
+      const email = transaction.user?.email || '';
+      const fullName = transaction.user?.fullName || '';
+      const planName = transaction.plan?.name || '';
+      const method = transaction.paymentMethod || '';
+
+      const matchesSearch =
+        !search ||
+        normalizeSearchText(code).includes(search) ||
+        normalizeSearchText(email).includes(search) ||
+        normalizeSearchText(fullName).includes(search) ||
+        normalizeSearchText(planName).includes(search);
+
+      const matchesMethod =
+        !paymentMethodFilter || method === paymentMethodFilter;
+
+      const matchesStatus =
+        !paymentStatusFilter ||
+        transaction.status === paymentStatusFilter;
+
       return matchesSearch && matchesMethod && matchesStatus;
     });
-  }, [paymentSearch, paymentMethodFilter, paymentStatusFilter]);
+  }, [
+    transactions,
+    paymentSearch,
+    paymentMethodFilter,
+    paymentStatusFilter,
+  ]);
 
-  const totalPaymentPages = Math.max(1, Math.ceil(filteredPayments.length / PAYMENT_PAGE_SIZE));
-  const paginatedPayments = filteredPayments.slice((paymentPage - 1) * PAYMENT_PAGE_SIZE, paymentPage * PAYMENT_PAGE_SIZE);
+  const totalPaymentPages = Math.max(
+    1,
+    Math.ceil(filteredTransactions.length / PAYMENT_PAGE_SIZE),
+  );
 
-  const paymentStatusBadge = (status: PaymentTransaction['status']) => {
-    if (status === 'success') return <Badge>Thành công</Badge>;
-    if (status === 'pending') return <Badge variant="secondary">Chờ xử lý</Badge>;
-    return <Badge variant="destructive">Thất bại</Badge>;
-  };
+  const paginatedTransactions = filteredTransactions.slice(
+    (paymentPage - 1) * PAYMENT_PAGE_SIZE,
+    paymentPage * PAYMENT_PAGE_SIZE,
+  );
 
-  /* ------------------------------- Hóa đơn ------------------------------- */
-  const [invoiceSearch, setInvoiceSearch] = useState('');
-  const [invoiceStatusFilter, setInvoiceStatusFilter] = useState('');
-  const [invoicePage, setInvoicePage] = useState(1);
-  const [viewingInvoice, setViewingInvoice] = useState<InvoiceRecord | null>(null);
+  const filteredPlans = useMemo(() => {
+    const search = normalizeSearchText(planSearch);
+
+    return plans.filter(
+      (plan) =>
+        !search ||
+        normalizeSearchText(plan.name).includes(search) ||
+        normalizeSearchText(plan.code).includes(search),
+    );
+  }, [plans, planSearch]);
+
+  const totalPlanPages = Math.max(
+    1,
+    Math.ceil(filteredPlans.length / PLAN_PAGE_SIZE),
+  );
+
+  const paginatedPlans = filteredPlans.slice(
+    (planPage - 1) * PLAN_PAGE_SIZE,
+    planPage * PLAN_PAGE_SIZE,
+  );
+
+  const invoices = useMemo<InvoiceItem[]>(
+    () =>
+      successfulTransactions.map((transaction) => ({
+        id: transaction.id,
+        code: `HD-${getTransactionCode(transaction)}`,
+        user:
+          transaction.user?.email ||
+          transaction.user?.fullName ||
+          'Không xác định',
+        plan: transaction.plan?.name || 'Không xác định',
+        method: transaction.paymentMethod || 'Không xác định',
+        amount: Number(transaction.amount || 0),
+        createdAt: transaction.paidAt || transaction.createdAt,
+        status: 'PAID',
+      })),
+    [successfulTransactions],
+  );
 
   const filteredInvoices = useMemo(() => {
     const search = normalizeSearchText(invoiceSearch);
-    return initialInvoices.filter((inv) => {
-      const matchesSearch = !search || normalizeSearchText(inv.code).includes(search) || normalizeSearchText(inv.user).includes(search);
-      const matchesStatus = !invoiceStatusFilter || inv.status === invoiceStatusFilter;
-      return matchesSearch && matchesStatus;
-    });
-  }, [invoiceSearch, invoiceStatusFilter]);
 
-  const totalInvoicePages = Math.max(1, Math.ceil(filteredInvoices.length / INVOICE_PAGE_SIZE));
-  const paginatedInvoices = filteredInvoices.slice((invoicePage - 1) * INVOICE_PAGE_SIZE, invoicePage * INVOICE_PAGE_SIZE);
+    return invoices.filter(
+      (invoice) =>
+        !search ||
+        normalizeSearchText(invoice.code).includes(search) ||
+        normalizeSearchText(invoice.user).includes(search) ||
+        normalizeSearchText(invoice.plan).includes(search),
+    );
+  }, [invoices, invoiceSearch]);
 
-  const invoiceStatusBadge = (status: InvoiceRecord['status']) => {
-    if (status === 'paid') return <Badge>Đã thanh toán</Badge>;
-    if (status === 'unpaid') return <Badge variant="secondary">Chưa thanh toán</Badge>;
-    return <Badge variant="destructive">Đã hủy</Badge>;
+  const totalInvoicePages = Math.max(
+    1,
+    Math.ceil(filteredInvoices.length / INVOICE_PAGE_SIZE),
+  );
+
+  const paginatedInvoices = filteredInvoices.slice(
+    (invoicePage - 1) * INVOICE_PAGE_SIZE,
+    invoicePage * INVOICE_PAGE_SIZE,
+  );
+
+  const paymentMethods = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          transactions
+            .map((transaction) => transaction.paymentMethod)
+            .filter((value): value is string => Boolean(value)),
+        ),
+      ),
+    [transactions],
+  );
+
+  const handleApprove = async (transaction: TransactionItem) => {
+    const confirmed = window.confirm(
+      `Xác nhận bạn đã kiểm tra tài khoản ngân hàng và muốn duyệt giao dịch ${getTransactionCode(
+        transaction,
+      )} với số tiền ${formatCurrency(transaction.amount)}?`,
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setApprovingId(transaction.id);
+      await approveTransaction(transaction.id);
+
+      toast.success('Đã duyệt giao dịch và kích hoạt gói thành công');
+
+      setViewingPayment(null);
+      await loadFinanceData();
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Không thể duyệt giao dịch';
+
+      toast.error(message);
+      console.error(error);
+    } finally {
+      setApprovingId(null);
+    }
   };
 
-  /* ------------------------------------------------------------------------ */
+  if (loading) {
+    return (
+      <div className="flex min-h-[55vh] flex-col items-center justify-center gap-3">
+        <Loader2 className="h-9 w-9 animate-spin text-indigo-500" />
+        <p className="text-sm text-muted-foreground">
+          Đang tải dữ liệu tài chính...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 text-slate-900 dark:text-slate-100">
-      <div className="flex items-center gap-3">
-        <div className="w-12 h-12 bg-gradient-to-br from-violet-500 via-indigo-500 to-fuchsia-500 rounded-xl flex items-center justify-center shadow-lg shadow-fuchsia-500/30">
-          <Wallet className="w-6 h-6 text-white" />
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 via-indigo-500 to-fuchsia-500 shadow-lg shadow-fuchsia-500/30">
+            <Wallet className="h-6 w-6 text-white" />
+          </div>
+
+          <div>
+            <h1 className="text-3xl font-bold">Quản lý Tài chính</h1>
+            <p className="mt-1 text-muted-foreground">
+              Quản lý giao dịch chuyển khoản, gói lưu trữ và hóa đơn.
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-3xl font-bold">Quản lý Tài chính</h1>
-          <p className="text-muted-foreground mt-1">Tổng quan doanh thu, gói lưu trữ, thanh toán và hóa đơn.</p>
-        </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          className="gap-2 rounded-xl"
+          disabled={refreshing}
+          onClick={() => void loadFinanceData(true)}
+        >
+          <RefreshCw
+            className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`}
+          />
+          Tải lại
+        </Button>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) =>
+          setActiveTab(value as typeof activeTab)
+        }
+      >
         <TabsList className="w-full sm:w-fit">
           <TabsTrigger value="dashboard" className="gap-2">
-            <LayoutDashboard className="w-4 h-4" />
+            <LayoutDashboard className="h-4 w-4" />
             Dashboard
           </TabsTrigger>
+
           <TabsTrigger value="storage" className="gap-2">
-            <HardDrive className="w-4 h-4" />
+            <HardDrive className="h-4 w-4" />
             Gói lưu trữ
           </TabsTrigger>
+
           <TabsTrigger value="payment" className="gap-2">
-            <CreditCard className="w-4 h-4" />
+            <CreditCard className="h-4 w-4" />
             Thanh toán
+            {waitingCount > 0 && (
+              <span className="ml-1 rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                {waitingCount}
+              </span>
+            )}
           </TabsTrigger>
+
           <TabsTrigger value="invoice" className="gap-2">
-            <Receipt className="w-4 h-4" />
+            <Receipt className="h-4 w-4" />
             Hóa đơn
           </TabsTrigger>
         </TabsList>
 
-        {/* ============================= DASHBOARD ============================= */}
-        <TabsContent value="dashboard" className="space-y-6 mt-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <TabsContent value="dashboard" className="mt-6 space-y-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {dashboardStats.map((item) => (
               <Card key={item.title} className={glowCard}>
                 <CardHeader>
@@ -471,31 +776,31 @@ export function AdminFinancePage() {
                       <CardTitle>{item.title}</CardTitle>
                       <CardDescription>{item.description}</CardDescription>
                     </div>
+
                     <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                      <item.icon className="w-5 h-5" />
+                      <item.icon className="h-5 w-5" />
                     </div>
                   </div>
                 </CardHeader>
+
                 <CardContent className="pt-0">
-                  <p className="text-2xl sm:text-3xl font-bold truncate">{item.value}</p>
+                  <p className="truncate text-2xl font-bold sm:text-3xl">
+                    {item.value}
+                  </p>
                 </CardContent>
               </Card>
             ))}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_0.6fr] gap-4">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_0.6fr]">
             <Card className={glowCard}>
               <CardHeader>
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
-                    <Wallet className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <CardTitle>Biểu đồ doanh thu</CardTitle>
-                    <CardDescription>Doanh thu 6 tháng gần nhất.</CardDescription>
-                  </div>
-                </div>
+                <CardTitle>Biểu đồ doanh thu</CardTitle>
+                <CardDescription>
+                  Doanh thu thật từ các giao dịch SUCCESS trong 6 tháng gần nhất.
+                </CardDescription>
               </CardHeader>
+
               <CardContent>
                 <RevenueLineChart data={revenueTrend} />
               </CardContent>
@@ -503,83 +808,99 @@ export function AdminFinancePage() {
 
             <Card className={glowCard}>
               <CardHeader>
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
-                    <Crown className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <CardTitle>Top gói bán chạy</CardTitle>
-                    <CardDescription>Xếp theo số lượt đăng ký.</CardDescription>
-                  </div>
-                </div>
+                <CardTitle>Top gói bán chạy</CardTitle>
+                <CardDescription>
+                  Xếp theo số giao dịch thành công.
+                </CardDescription>
               </CardHeader>
+
               <CardContent className="space-y-3">
-                {topPlans.map((plan, index) => (
-                  <div key={plan.name} className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-muted/50 p-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">
-                        {index + 1}
+                {topPlans.length === 0 ? (
+                  <p className="rounded-xl border border-dashed border-border py-8 text-center text-sm text-muted-foreground">
+                    Chưa có dữ liệu.
+                  </p>
+                ) : (
+                  topPlans.map((plan, index) => (
+                    <div
+                      key={plan.name}
+                      className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-muted/50 p-3"
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                          {index + 1}
+                        </span>
+                        <span className="truncate text-sm font-semibold">
+                          {plan.name}
+                        </span>
+                      </div>
+
+                      <span className="shrink-0 text-sm text-muted-foreground">
+                        {plan.sold} lượt
                       </span>
-                      <span className="truncate text-sm font-semibold">{plan.name}</span>
                     </div>
-                    <span className="text-sm text-muted-foreground shrink-0">{plan.sold} lượt</span>
-                  </div>
-                ))}
+                  ))
+                )}
               </CardContent>
             </Card>
           </div>
 
           <Card className={glowCard}>
             <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
-                  <CreditCard className="w-5 h-5" />
-                </div>
-                <div>
-                  <CardTitle>Thống kê thanh toán</CardTitle>
-                  <CardDescription>Tỷ lệ giao dịch theo phương thức thanh toán.</CardDescription>
-                </div>
-              </div>
+              <CardTitle>Thống kê phương thức thanh toán</CardTitle>
+              <CardDescription>
+                Tỷ lệ giao dịch theo phương thức thực tế.
+              </CardDescription>
             </CardHeader>
+
             <CardContent className="space-y-4">
-              {paymentMethodStats.map((item) => {
-                const ratio = totalPaymentCount ? Math.round((item.count / totalPaymentCount) * 100) : 0;
-                return (
-                  <div key={item.method} className="space-y-1.5">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-semibold">{item.method}</span>
-                      <span className="text-muted-foreground">{item.count} giao dịch · {ratio}%</span>
+              {paymentMethodStats.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Chưa có giao dịch.
+                </p>
+              ) : (
+                paymentMethodStats.map((item) => {
+                  const ratio = totalPaymentCount
+                    ? Math.round((item.count / totalPaymentCount) * 100)
+                    : 0;
+
+                  return (
+                    <div key={item.method} className="space-y-1.5">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-semibold">{item.method}</span>
+                        <span className="text-muted-foreground">
+                          {item.count} giao dịch · {ratio}%
+                        </span>
+                      </div>
+
+                      <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-primary"
+                          style={{ width: `${ratio}%` }}
+                        />
+                      </div>
                     </div>
-                    <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
-                      <div className="h-full rounded-full bg-primary" style={{ width: `${ratio}%` }} />
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* ============================= GÓI LƯU TRỮ ============================= */}
-        <TabsContent value="storage" className="space-y-6 mt-6">
+        <TabsContent value="storage" className="mt-6 space-y-6">
           <Card className={glowCard}>
             <CardContent className="p-4 md:p-6">
-              <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-                <div className="space-y-1 flex-1 max-w-sm">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tìm kiếm</label>
-                  <input
-                    type="text"
-                    value={planSearch}
-                    onChange={(e) => { setPlanSearch(e.target.value); setPlanPage(1); }}
-                    placeholder="Tìm theo tên gói..."
-                    aria-label="Tìm kiếm gói lưu trữ"
-                    className="w-full h-11 rounded-xl border border-input bg-background px-4 text-sm outline-none focus:ring-2 focus:ring-sky-400/40"
-                  />
-                </div>
-                <Button onClick={openAddPlanDialog} size="sm" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl">
-                  <Plus className="w-4 h-4" />
-                  Thêm gói
-                </Button>
+              <div className="relative max-w-sm">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="text"
+                  value={planSearch}
+                  onChange={(event) => {
+                    setPlanSearch(event.target.value);
+                    setPlanPage(1);
+                  }}
+                  placeholder="Tìm tên hoặc mã gói..."
+                  className="h-11 w-full rounded-xl border border-input bg-background pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-sky-400/40"
+                />
               </div>
             </CardContent>
           </Card>
@@ -588,144 +909,170 @@ export function AdminFinancePage() {
             <CardContent className="p-4 md:p-6">
               <div className="overflow-x-auto">
                 <Table>
-                  <TableHeader className="bg-muted/40 border-b border-border">
+                  <TableHeader className="border-b border-border bg-muted/40">
                     <TableRow>
-                      <TableHead className="py-4 px-6">Tên gói</TableHead>
-                      <TableHead className="py-4 px-4">Giá</TableHead>
-                      <TableHead className="py-4 px-4">Dung lượng</TableHead>
-                      <TableHead className="py-4 px-4">Chu kỳ</TableHead>
-                      <TableHead className="py-4 px-4">Trạng thái</TableHead>
-                      <TableHead className="py-4 px-6 text-right">Thao tác</TableHead>
+                      <TableHead className="px-6 py-4">Tên gói</TableHead>
+                      <TableHead className="px-4 py-4">Mã</TableHead>
+                      <TableHead className="px-4 py-4">Giá</TableHead>
+                      <TableHead className="px-4 py-4">Dung lượng</TableHead>
+                      <TableHead className="px-4 py-4">Chat/ngày</TableHead>
+                      <TableHead className="px-4 py-4">Thời hạn</TableHead>
+                      <TableHead className="px-6 py-4 text-right">
+                        Trạng thái
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
+
                   <TableBody>
                     {paginatedPlans.map((plan) => (
-                      <TableRow key={plan.id} className="hover:bg-muted/10 border-b border-border last:border-0 transition-colors">
-                        <TableCell className="py-4 px-6 font-medium">
-                          <Badge variant={plan.badgeColor}>{plan.name}</Badge>
+                      <TableRow key={plan.id}>
+                        <TableCell className="px-6 py-4 font-semibold">
+                          {plan.name}
                         </TableCell>
-                        <TableCell className="py-4 px-4">{plan.price.toLocaleString('vi-VN')}đ</TableCell>
-                        <TableCell className="py-4 px-4 text-muted-foreground">{plan.storage}</TableCell>
-                        <TableCell className="py-4 px-4 text-muted-foreground">{plan.cycle}</TableCell>
-                        <TableCell className="py-4 px-4">
-                          <Badge variant={plan.status === 'active' ? 'default' : 'secondary'}>
-                            {plan.status === 'active' ? 'Đang hoạt động' : 'Ngừng bán'}
-                          </Badge>
+                        <TableCell className="px-4 py-4 text-muted-foreground">
+                          {plan.code}
                         </TableCell>
-                        <TableCell className="py-4 px-6 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => openEditPlanDialog(plan)}
-                              className="h-8 w-8 rounded-full p-0 text-amber-600 hover:text-amber-700"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDeletePlan(plan.id)}
-                              className="h-8 w-8 rounded-full p-0 text-destructive hover:text-destructive/80"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
+                        <TableCell className="px-4 py-4">
+                          {formatCurrency(plan.price)}
+                        </TableCell>
+                        <TableCell className="px-4 py-4">
+                          {bytesToGb(plan.storageLimit)}
+                        </TableCell>
+                        <TableCell className="px-4 py-4">
+                          {plan.dailyChatLimit.toLocaleString('vi-VN')}
+                        </TableCell>
+                        <TableCell className="px-4 py-4">
+                          {plan.durationDays} ngày
+                        </TableCell>
+                        <TableCell className="px-6 py-4 text-right">
+                          {plan.isActive ? (
+                            <Badge className="bg-emerald-600 text-white">
+                              Đang hoạt động
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary">Ngừng bán</Badge>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
+
                     {paginatedPlans.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                          Không tìm thấy gói lưu trữ nào.
+                        <TableCell
+                          colSpan={7}
+                          className="py-10 text-center text-muted-foreground"
+                        >
+                          Không tìm thấy gói lưu trữ.
                         </TableCell>
                       </TableRow>
                     )}
                   </TableBody>
                 </Table>
               </div>
+
               {filteredPlans.length > 0 && (
-                <div className="flex items-center justify-between mt-4 px-1">
-                  <p className="text-sm text-muted-foreground">
-                    {(planPage - 1) * PLAN_PAGE_SIZE + 1}–{Math.min(planPage * PLAN_PAGE_SIZE, filteredPlans.length)}/{filteredPlans.length} gói
-                  </p>
-                  <div className="flex items-center gap-1">
-                    <Button variant="outline" size="sm" className="h-8 w-8 p-0" disabled={planPage === 1} onClick={() => setPlanPage((p) => Math.max(1, p - 1))}>
-                      <ChevronLeft className="w-4 h-4" />
-                    </Button>
-                    {Array.from({ length: totalPlanPages }, (_, i) => i + 1).map((page) => (
-                      <Button key={page} variant={page === planPage ? 'default' : 'outline'} size="sm" className="h-8 w-8 p-0 text-xs" onClick={() => setPlanPage(page)}>
-                        {page}
-                      </Button>
-                    ))}
-                    <Button variant="outline" size="sm" className="h-8 w-8 p-0" disabled={planPage === totalPlanPages} onClick={() => setPlanPage((p) => Math.min(totalPlanPages, p + 1))}>
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
+                <PaginationFooter
+                  page={planPage}
+                  pageSize={PLAN_PAGE_SIZE}
+                  totalItems={filteredPlans.length}
+                  totalPages={totalPlanPages}
+                  onPageChange={setPlanPage}
+                  label="gói"
+                />
               )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* ============================= THANH TOÁN ============================= */}
-        <TabsContent value="payment" className="space-y-6 mt-6">
+        <TabsContent value="payment" className="mt-6 space-y-6">
           <Card className={glowCard}>
-            <CardContent className="p-4 md:p-6 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <CardContent className="space-y-4 p-4 md:p-6">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tìm kiếm</label>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Tìm kiếm
+                  </label>
                   <input
                     type="text"
                     value={paymentSearch}
-                    onChange={(e) => { setPaymentSearch(e.target.value); setPaymentPage(1); }}
-                    placeholder="Tìm theo mã GD hoặc email..."
-                    aria-label="Tìm kiếm giao dịch"
-                    className="w-full h-11 rounded-xl border border-input bg-background px-4 text-sm outline-none focus:ring-2 focus:ring-sky-400/40"
+                    onChange={(event) => {
+                      setPaymentSearch(event.target.value);
+                      setPaymentPage(1);
+                    }}
+                    placeholder="Mã GD, email, tên hoặc gói..."
+                    className="h-11 w-full rounded-xl border border-input bg-background px-4 text-sm outline-none focus:ring-2 focus:ring-sky-400/40"
                   />
                 </div>
+
                 <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Phương thức</label>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Phương thức
+                  </label>
                   <select
                     value={paymentMethodFilter}
-                    onChange={(e) => { setPaymentMethodFilter(e.target.value); setPaymentPage(1); }}
-                    aria-label="Lọc theo phương thức"
-                    className="w-full h-11 rounded-xl border border-input bg-background px-4 text-sm"
+                    onChange={(event) => {
+                      setPaymentMethodFilter(event.target.value);
+                      setPaymentPage(1);
+                    }}
+                    className="h-11 w-full rounded-xl border border-input bg-background px-4 text-sm"
                   >
                     <option value="">Tất cả phương thức</option>
-                    <option value="VNPay">VNPay</option>
-                    <option value="MoMo QR">MoMo QR</option>
+                    {paymentMethods.map((method) => (
+                      <option key={method} value={method}>
+                        {method}
+                      </option>
+                    ))}
                   </select>
                 </div>
+
                 <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trạng thái</label>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Trạng thái
+                  </label>
                   <select
                     value={paymentStatusFilter}
-                    onChange={(e) => { setPaymentStatusFilter(e.target.value); setPaymentPage(1); }}
-                    aria-label="Lọc theo trạng thái"
-                    className="w-full h-11 rounded-xl border border-input bg-background px-4 text-sm"
+                    onChange={(event) => {
+                      setPaymentStatusFilter(event.target.value);
+                      setPaymentPage(1);
+                    }}
+                    className="h-11 w-full rounded-xl border border-input bg-background px-4 text-sm"
                   >
                     <option value="">Tất cả trạng thái</option>
-                    <option value="success">Thành công</option>
-                    <option value="failed">Thất bại</option>
-                    <option value="pending">Chờ xử lý</option>
+                    <option value="WAITING_CONFIRMATION">
+                      Chờ Admin duyệt
+                    </option>
+                    <option value="PENDING">Chờ chuyển khoản</option>
+                    <option value="PROCESSING">Đang xử lý</option>
+                    <option value="SUCCESS">Thành công</option>
+                    <option value="FAILED">Thất bại</option>
+                    <option value="CANCELLED">Đã hủy</option>
                   </select>
                 </div>
               </div>
-              {(paymentSearch || paymentMethodFilter || paymentStatusFilter) && (
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground">Tìm thấy {filteredPayments.length} giao dịch phù hợp.</p>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 text-xs text-sky-600 hover:text-sky-600"
-                    onClick={() => { setPaymentSearch(''); setPaymentMethodFilter(''); setPaymentStatusFilter(''); setPaymentPage(1); }}
-                  >
-                    Xóa bộ lọc
-                  </Button>
-                </div>
-              )}
+
+              {(paymentSearch ||
+                paymentMethodFilter ||
+                paymentStatusFilter) && (
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">
+                      Tìm thấy {filteredTransactions.length} giao dịch.
+                    </p>
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setPaymentSearch('');
+                        setPaymentMethodFilter('');
+                        setPaymentStatusFilter('');
+                        setPaymentPage(1);
+                      }}
+                    >
+                      Xóa bộ lọc
+                    </Button>
+                  </div>
+                )}
             </CardContent>
           </Card>
 
@@ -733,101 +1080,160 @@ export function AdminFinancePage() {
             <CardContent className="p-4 md:p-6">
               <div className="overflow-x-auto">
                 <Table>
-                  <TableHeader className="bg-muted/40 border-b border-border">
+                  <TableHeader className="border-b border-border bg-muted/40">
                     <TableRow>
-                      <TableHead className="py-4 px-6">Mã giao dịch</TableHead>
-                      <TableHead className="py-4 px-4">Người dùng</TableHead>
-                      <TableHead className="py-4 px-4">Gói</TableHead>
-                      <TableHead className="py-4 px-4">Phương thức</TableHead>
-                      <TableHead className="py-4 px-4">Số tiền</TableHead>
-                      <TableHead className="py-4 px-4">Ngày thanh toán</TableHead>
-                      <TableHead className="py-4 px-4">Trạng thái</TableHead>
-                      <TableHead className="py-4 px-6 text-right">Thao tác</TableHead>
+                      <TableHead className="px-6 py-4">
+                        Mã giao dịch
+                      </TableHead>
+                      <TableHead className="px-4 py-4">
+                        Người dùng
+                      </TableHead>
+                      <TableHead className="px-4 py-4">Gói</TableHead>
+                      <TableHead className="px-4 py-4">
+                        Phương thức
+                      </TableHead>
+                      <TableHead className="px-4 py-4">Số tiền</TableHead>
+                      <TableHead className="px-4 py-4">Ngày tạo</TableHead>
+                      <TableHead className="px-4 py-4">
+                        Trạng thái
+                      </TableHead>
+                      <TableHead className="px-6 py-4 text-right">
+                        Thao tác
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
+
                   <TableBody>
-                    {paginatedPayments.map((txn) => (
-                      <TableRow key={txn.id} className="hover:bg-muted/10 border-b border-border last:border-0 transition-colors">
-                        <TableCell className="py-4 px-6 font-medium">{txn.code}</TableCell>
-                        <TableCell className="py-4 px-4 text-muted-foreground">{txn.user}</TableCell>
-                        <TableCell className="py-4 px-4">{txn.plan}</TableCell>
-                        <TableCell className="py-4 px-4">{txn.method}</TableCell>
-                        <TableCell className="py-4 px-4 whitespace-nowrap">
-                          {formatCurrency(txn.amount)}
-                        </TableCell>
-                        <TableCell className="py-4 px-4 text-muted-foreground">{txn.paidAt}</TableCell>
-                        <TableCell className="py-4 px-4">{paymentStatusBadge(txn.status)}</TableCell>
-                        <TableCell className="py-4 px-6 text-right">
-                          <Button variant="ghost" size="icon" onClick={() => setViewingPayment(txn)} className="h-8 w-8 rounded-full p-0 text-muted-foreground hover:text-foreground">
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {paginatedPayments.length === 0 && (
+                    {paginatedTransactions.map((transaction) => {
+                      const isApproving =
+                        approvingId === transaction.id;
+
+                      return (
+                        <TableRow key={transaction.id}>
+                          <TableCell className="px-6 py-4 font-mono text-xs font-semibold">
+                            {getTransactionCode(transaction)}
+                          </TableCell>
+
+                          <TableCell className="px-4 py-4">
+                            <p className="font-medium">
+                              {transaction.user?.fullName ||
+                                'Chưa cập nhật tên'}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {transaction.user?.email || '—'}
+                            </p>
+                          </TableCell>
+
+                          <TableCell className="px-4 py-4">
+                            {transaction.plan?.name || '—'}
+                          </TableCell>
+
+                          <TableCell className="px-4 py-4">
+                            {transaction.paymentMethod || '—'}
+                          </TableCell>
+
+                          <TableCell className="whitespace-nowrap px-4 py-4 font-semibold">
+                            {formatCurrency(transaction.amount)}
+                          </TableCell>
+
+                          <TableCell className="px-4 py-4 text-muted-foreground">
+                            {formatDate(
+                              transaction.paidAt ||
+                              transaction.createdAt,
+                            )}
+                          </TableCell>
+
+                          <TableCell className="px-4 py-4">
+                            <TransactionStatusBadge
+                              status={transaction.status}
+                            />
+                          </TableCell>
+
+                          <TableCell className="px-6 py-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                title="Xem chi tiết"
+                                onClick={() =>
+                                  setViewingPayment(transaction)
+                                }
+                                className="h-8 w-8 rounded-full"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+
+                              {transaction.status ===
+                                'WAITING_CONFIRMATION' && (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    disabled={isApproving}
+                                    onClick={() =>
+                                      void handleApprove(transaction)
+                                    }
+                                    className="gap-1.5 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700"
+                                  >
+                                    {isApproving ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <CheckCircle2 className="h-4 w-4" />
+                                    )}
+                                    {isApproving
+                                      ? 'Đang duyệt'
+                                      : 'Duyệt'}
+                                  </Button>
+                                )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+
+                    {paginatedTransactions.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                          Không tìm thấy giao dịch nào.
+                        <TableCell
+                          colSpan={8}
+                          className="py-10 text-center text-muted-foreground"
+                        >
+                          Không tìm thấy giao dịch.
                         </TableCell>
                       </TableRow>
                     )}
                   </TableBody>
                 </Table>
               </div>
-              {filteredPayments.length > 0 && (
-                <div className="flex items-center justify-between mt-4 px-1">
-                  <p className="text-sm text-muted-foreground">
-                    {(paymentPage - 1) * PAYMENT_PAGE_SIZE + 1}–{Math.min(paymentPage * PAYMENT_PAGE_SIZE, filteredPayments.length)}/{filteredPayments.length} giao dịch
-                  </p>
-                  <div className="flex items-center gap-1">
-                    <Button variant="outline" size="sm" className="h-8 w-8 p-0" disabled={paymentPage === 1} onClick={() => setPaymentPage((p) => Math.max(1, p - 1))}>
-                      <ChevronLeft className="w-4 h-4" />
-                    </Button>
-                    {Array.from({ length: totalPaymentPages }, (_, i) => i + 1).map((page) => (
-                      <Button key={page} variant={page === paymentPage ? 'default' : 'outline'} size="sm" className="h-8 w-8 p-0 text-xs" onClick={() => setPaymentPage(page)}>
-                        {page}
-                      </Button>
-                    ))}
-                    <Button variant="outline" size="sm" className="h-8 w-8 p-0" disabled={paymentPage === totalPaymentPages} onClick={() => setPaymentPage((p) => Math.min(totalPaymentPages, p + 1))}>
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
+
+              {filteredTransactions.length > 0 && (
+                <PaginationFooter
+                  page={paymentPage}
+                  pageSize={PAYMENT_PAGE_SIZE}
+                  totalItems={filteredTransactions.length}
+                  totalPages={totalPaymentPages}
+                  onPageChange={setPaymentPage}
+                  label="giao dịch"
+                />
               )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* ============================= HÓA ĐƠN ============================= */}
-        <TabsContent value="invoice" className="space-y-6 mt-6">
+        <TabsContent value="invoice" className="mt-6 space-y-6">
           <Card className={glowCard}>
-            <CardContent className="p-4 md:p-6 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tìm kiếm</label>
-                  <input
-                    type="text"
-                    value={invoiceSearch}
-                    onChange={(e) => { setInvoiceSearch(e.target.value); setInvoicePage(1); }}
-                    placeholder="Tìm theo mã hóa đơn hoặc email..."
-                    aria-label="Tìm kiếm hóa đơn"
-                    className="w-full h-11 rounded-xl border border-input bg-background px-4 text-sm outline-none focus:ring-2 focus:ring-sky-400/40"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trạng thái</label>
-                  <select
-                    value={invoiceStatusFilter}
-                    onChange={(e) => { setInvoiceStatusFilter(e.target.value); setInvoicePage(1); }}
-                    aria-label="Lọc theo trạng thái hóa đơn"
-                    className="w-full h-11 rounded-xl border border-input bg-background px-4 text-sm"
-                  >
-                    <option value="">Tất cả trạng thái</option>
-                    <option value="paid">Đã thanh toán</option>
-                    <option value="unpaid">Chưa thanh toán</option>
-                    <option value="cancelled">Đã hủy</option>
-                  </select>
-                </div>
+            <CardContent className="p-4 md:p-6">
+              <div className="relative max-w-md">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="text"
+                  value={invoiceSearch}
+                  onChange={(event) => {
+                    setInvoiceSearch(event.target.value);
+                    setInvoicePage(1);
+                  }}
+                  placeholder="Tìm mã hóa đơn, email hoặc gói..."
+                  className="h-11 w-full rounded-xl border border-input bg-background pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-sky-400/40"
+                />
               </div>
             </CardContent>
           </Card>
@@ -836,253 +1242,264 @@ export function AdminFinancePage() {
             <CardContent className="p-4 md:p-6">
               <div className="overflow-x-auto">
                 <Table>
-                  <TableHeader className="bg-muted/40 border-b border-border">
+                  <TableHeader className="border-b border-border bg-muted/40">
                     <TableRow>
-                      <TableHead className="py-4 px-6">Mã hóa đơn</TableHead>
-                      <TableHead className="py-4 px-4">Người dùng</TableHead>
-                      <TableHead className="py-4 px-4">Gói</TableHead>
-                      <TableHead className="py-4 px-4">Phương thức</TableHead>
-                      <TableHead className="py-4 px-4">Số tiền</TableHead>
-                      <TableHead className="py-4 px-4">Ngày tạo</TableHead>
-                      <TableHead className="py-4 px-4">Trạng thái</TableHead>
-                      <TableHead className="py-4 px-6 text-right">Thao tác</TableHead>
+                      <TableHead className="px-6 py-4">Mã hóa đơn</TableHead>
+                      <TableHead className="px-4 py-4">Người dùng</TableHead>
+                      <TableHead className="px-4 py-4">Gói</TableHead>
+                      <TableHead className="px-4 py-4">
+                        Phương thức
+                      </TableHead>
+                      <TableHead className="px-4 py-4">Số tiền</TableHead>
+                      <TableHead className="px-4 py-4">
+                        Ngày thanh toán
+                      </TableHead>
+                      <TableHead className="px-6 py-4 text-right">
+                        Trạng thái
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
+
                   <TableBody>
-                    {paginatedInvoices.map((inv) => (
-                      <TableRow key={inv.id} className="hover:bg-muted/10 border-b border-border last:border-0 transition-colors">
-                        <TableCell className="py-4 px-6 font-medium">{inv.code}</TableCell>
-                        <TableCell className="py-4 px-4 text-muted-foreground">{inv.user}</TableCell>
-                        <TableCell className="py-4 px-4">{inv.plan}</TableCell>
-                        <TableCell className="py-4 px-4">{inv.method}</TableCell>
-                        <TableCell className="py-4 px-4 whitespace-nowrap">
-                          {formatCurrency(inv.amount)}
+                    {paginatedInvoices.map((invoice) => (
+                      <TableRow key={invoice.id}>
+                        <TableCell className="px-6 py-4 font-mono text-xs font-semibold">
+                          {invoice.code}
                         </TableCell>
-                        <TableCell className="py-4 px-4 text-muted-foreground">{inv.createdAt}</TableCell>
-                        <TableCell className="py-4 px-4">{invoiceStatusBadge(inv.status)}</TableCell>
-                        <TableCell className="py-4 px-6 text-right">
-                          <Button variant="ghost" size="icon" onClick={() => setViewingInvoice(inv)} className="h-8 w-8 rounded-full p-0 text-muted-foreground hover:text-foreground">
-                            <Eye className="w-4 h-4" />
-                          </Button>
+                        <TableCell className="px-4 py-4">
+                          {invoice.user}
+                        </TableCell>
+                        <TableCell className="px-4 py-4">
+                          {invoice.plan}
+                        </TableCell>
+                        <TableCell className="px-4 py-4">
+                          {invoice.method}
+                        </TableCell>
+                        <TableCell className="px-4 py-4 font-semibold">
+                          {formatCurrency(invoice.amount)}
+                        </TableCell>
+                        <TableCell className="px-4 py-4 text-muted-foreground">
+                          {formatDate(invoice.createdAt)}
+                        </TableCell>
+                        <TableCell className="px-6 py-4 text-right">
+                          <Badge className="bg-emerald-600 text-white">
+                            Đã thanh toán
+                          </Badge>
                         </TableCell>
                       </TableRow>
                     ))}
+
                     {paginatedInvoices.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                          Không tìm thấy hóa đơn nào.
+                        <TableCell
+                          colSpan={7}
+                          className="py-10 text-center text-muted-foreground"
+                        >
+                          Chưa có hóa đơn thanh toán thành công.
                         </TableCell>
                       </TableRow>
                     )}
                   </TableBody>
                 </Table>
               </div>
+
               {filteredInvoices.length > 0 && (
-                <div className="flex items-center justify-between mt-4 px-1">
-                  <p className="text-sm text-muted-foreground">
-                    {(invoicePage - 1) * INVOICE_PAGE_SIZE + 1}–{Math.min(invoicePage * INVOICE_PAGE_SIZE, filteredInvoices.length)}/{filteredInvoices.length} hóa đơn
-                  </p>
-                  <div className="flex items-center gap-1">
-                    <Button variant="outline" size="sm" className="h-8 w-8 p-0" disabled={invoicePage === 1} onClick={() => setInvoicePage((p) => Math.max(1, p - 1))}>
-                      <ChevronLeft className="w-4 h-4" />
-                    </Button>
-                    {Array.from({ length: totalInvoicePages }, (_, i) => i + 1).map((page) => (
-                      <Button key={page} variant={page === invoicePage ? 'default' : 'outline'} size="sm" className="h-8 w-8 p-0 text-xs" onClick={() => setInvoicePage(page)}>
-                        {page}
-                      </Button>
-                    ))}
-                    <Button variant="outline" size="sm" className="h-8 w-8 p-0" disabled={invoicePage === totalInvoicePages} onClick={() => setInvoicePage((p) => Math.min(totalInvoicePages, p + 1))}>
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
+                <PaginationFooter
+                  page={invoicePage}
+                  pageSize={INVOICE_PAGE_SIZE}
+                  totalItems={filteredInvoices.length}
+                  totalPages={totalInvoicePages}
+                  onPageChange={setInvoicePage}
+                  label="hóa đơn"
+                />
               )}
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
-      {/* ===================== Dialog thêm/sửa gói lưu trữ ===================== */}
-      <Dialog open={planDialogOpen} onOpenChange={setPlanDialogOpen}>
-        <DialogContent className="sm:max-w-[560px] rounded-3xl p-6 border-border bg-background max-h-[85vh] overflow-y-auto">
-          <DialogHeader className="mb-4">
-            <DialogTitle className="text-xl font-bold text-foreground">
-              {editingPlan ? 'Sửa gói lưu trữ' : 'Thêm gói lưu trữ mới'}
-            </DialogTitle>
-            <DialogDescription className="text-sm text-muted-foreground">
-              Điền thông tin gói lưu trữ / gói đăng ký bên dưới.
+      <Dialog
+        open={Boolean(viewingPayment)}
+        onOpenChange={(open) => {
+          if (!open) setViewingPayment(null);
+        }}
+      >
+        <DialogContent className="max-h-[85vh] overflow-y-auto rounded-3xl border-border bg-background sm:max-w-[540px]">
+          <DialogHeader>
+            <DialogTitle>Chi tiết giao dịch</DialogTitle>
+            <DialogDescription>
+              {viewingPayment
+                ? getTransactionCode(viewingPayment)
+                : ''}
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSubmitPlan} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="planName" className="text-sm font-semibold text-foreground">Tên gói *</Label>
-                <Input
-                  id="planName"
-                  value={planForm.name}
-                  onChange={(e) => setPlanForm((f) => ({ ...f, name: e.target.value }))}
-                  placeholder="Ví dụ: Premium 1 tháng"
-                  required
-                  className="rounded-xl"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="planPrice" className="text-sm font-semibold text-foreground">Giá (VNĐ) *</Label>
-                <Input
-                  id="planPrice"
-                  type="number"
-                  min={0}
-                  value={planForm.price}
-                  onChange={(e) => setPlanForm((f) => ({ ...f, price: e.target.value }))}
-                  placeholder="0"
-                  required
-                  className="rounded-xl"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="planStorage" className="text-sm font-semibold text-foreground">Dung lượng *</Label>
-                <Input
-                  id="planStorage"
-                  value={planForm.storage}
-                  onChange={(e) => setPlanForm((f) => ({ ...f, storage: e.target.value }))}
-                  placeholder="Ví dụ: 50 GB"
-                  required
-                  className="rounded-xl"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="planCycle" className="text-sm font-semibold text-foreground">Chu kỳ *</Label>
-                <Input
-                  id="planCycle"
-                  value={planForm.cycle}
-                  onChange={(e) => setPlanForm((f) => ({ ...f, cycle: e.target.value }))}
-                  placeholder="Ví dụ: 30 ngày"
-                  required
-                  className="rounded-xl"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="planBadgeColor" className="text-sm font-semibold text-foreground">Màu badge</Label>
-              <select
-                id="planBadgeColor"
-                value={planForm.badgeColor}
-                onChange={(e) => setPlanForm((f) => ({ ...f, badgeColor: e.target.value as BadgeColor }))}
-                className="w-full h-11 rounded-xl border border-input bg-background px-4 text-sm"
-              >
-                <option value="default">Mặc định (primary)</option>
-                <option value="secondary">Secondary</option>
-                <option value="outline">Outline</option>
-                <option value="destructive">Destructive</option>
-              </select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="planPermissions" className="text-sm font-semibold text-foreground">Danh sách quyền</Label>
-              <Textarea
-                id="planPermissions"
-                value={planForm.permissionsText}
-                onChange={(e) => setPlanForm((f) => ({ ...f, permissionsText: e.target.value }))}
-                placeholder={'Mỗi quyền 1 dòng, ví dụ:\nTruy cập đầy đủ tài liệu\nChat AI không giới hạn'}
-                className="min-h-[90px] rounded-xl"
-              />
-            </div>
-
-            <div className="flex items-center justify-between rounded-xl border border-border p-3">
-              <div>
-                <p className="text-sm font-semibold text-foreground">Trạng thái hoạt động</p>
-                <p className="text-xs text-muted-foreground">Bật để hiển thị gói cho người dùng đăng ký.</p>
-              </div>
-              <Switch checked={planForm.status} onCheckedChange={(checked) => setPlanForm((f) => ({ ...f, status: checked }))} />
-            </div>
-
-            {/* Preview Card — giống phong cách Card thông tin ở trang User */}
-            <div className="space-y-1.5">
-              <Label className="text-sm font-semibold text-foreground">Xem trước</Label>
-              <Card className={glowCard}>
-                <CardContent className="p-4 space-y-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <Badge variant={planForm.badgeColor}>{planForm.name || 'Tên gói'}</Badge>
-                    <Badge variant={planForm.status ? 'default' : 'secondary'}>
-                      {planForm.status ? 'Đang hoạt động' : 'Ngừng bán'}
-                    </Badge>
-                  </div>
-                  <p className="text-xl font-bold">
-                    {(Number(planForm.price) || 0).toLocaleString('vi-VN')}đ
-                    <span className="text-sm font-normal text-muted-foreground"> / {planForm.cycle || 'chu kỳ'}</span>
-                  </p>
-                  <p className="text-sm text-muted-foreground">Dung lượng: {planForm.storage || '—'}</p>
-                  {planForm.permissionsText.trim() && (
-                    <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-0.5">
-                      {planForm.permissionsText.split('\n').filter(Boolean).map((perm) => (
-                        <li key={perm}>{perm}</li>
-                      ))}
-                    </ul>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            <DialogFooter className="pt-2 flex gap-2 justify-end">
-              <Button type="button" variant="outline" onClick={() => setPlanDialogOpen(false)} className="rounded-xl">
-                Hủy
-              </Button>
-              <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl">
-                Lưu
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* ===================== Dialog xem nhanh giao dịch thanh toán ===================== */}
-      <Dialog open={!!viewingPayment} onOpenChange={(open) => !open && setViewingPayment(null)}>
-        <DialogContent className="sm:max-w-[420px] rounded-3xl p-6 border-border bg-background">
-          <DialogHeader className="mb-2">
-            <DialogTitle className="text-xl font-bold text-foreground">Chi tiết giao dịch</DialogTitle>
-            <DialogDescription className="text-sm text-muted-foreground">{viewingPayment?.code}</DialogDescription>
-          </DialogHeader>
           {viewingPayment && (
             <div className="space-y-3 text-sm">
-              <div className="flex justify-between"><span className="text-muted-foreground">Người dùng</span><span className="font-medium">{viewingPayment.user}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Gói</span><span className="font-medium">{viewingPayment.plan}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Phương thức</span><span className="font-medium">{viewingPayment.method}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Số tiền</span><span className="font-medium">{viewingPayment.amount.toLocaleString('vi-VN')}đ</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Thời gian</span><span className="font-medium">{viewingPayment.paidAt}</span></div>
-              <div className="flex justify-between items-center"><span className="text-muted-foreground">Trạng thái</span>{paymentStatusBadge(viewingPayment.status)}</div>
+              <DetailRow
+                label="Người dùng"
+                value={
+                  viewingPayment.user?.fullName ||
+                  viewingPayment.user?.email ||
+                  '—'
+                }
+              />
+              <DetailRow
+                label="Email"
+                value={viewingPayment.user?.email || '—'}
+              />
+              <DetailRow
+                label="Gói"
+                value={viewingPayment.plan?.name || '—'}
+              />
+              <DetailRow
+                label="Phương thức"
+                value={viewingPayment.paymentMethod || '—'}
+              />
+              <DetailRow
+                label="Số tiền"
+                value={formatCurrency(viewingPayment.amount)}
+              />
+              <DetailRow
+                label="Nội dung chuyển khoản"
+                value={viewingPayment.orderInfo || '—'}
+                mono
+              />
+              <DetailRow
+                label="Ngày tạo"
+                value={formatDate(viewingPayment.createdAt)}
+              />
+              <DetailRow
+                label="Ngày thanh toán"
+                value={formatDate(viewingPayment.paidAt)}
+              />
+              <DetailRow
+                label="Mã phản hồi"
+                value={viewingPayment.responseCode || '—'}
+              />
+
+              <div className="flex items-center justify-between rounded-xl border border-border p-3">
+                <span className="text-muted-foreground">Trạng thái</span>
+                <TransactionStatusBadge status={viewingPayment.status} />
+              </div>
             </div>
           )}
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setViewingPayment(null)}
+            >
+              Đóng
+            </Button>
+
+            {viewingPayment?.status === 'WAITING_CONFIRMATION' && (
+              <Button
+                type="button"
+                disabled={approvingId === viewingPayment.id}
+                onClick={() => void handleApprove(viewingPayment)}
+                className="gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
+              >
+                {approvingId === viewingPayment.id ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4" />
+                )}
+                Duyệt giao dịch
+              </Button>
+            )}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
 
-      {/* ===================== Drawer xem chi tiết hóa đơn (bên phải) ===================== */}
-      <Sheet open={!!viewingInvoice} onOpenChange={(open) => !open && setViewingInvoice(null)}>
-        <SheetContent side="right" className="w-full sm:max-w-md">
-          <SheetHeader>
-            <SheetTitle>Chi tiết hóa đơn</SheetTitle>
-            <SheetDescription>{viewingInvoice?.code}</SheetDescription>
-          </SheetHeader>
-          {viewingInvoice && (
-            <div className="px-4 pb-4 space-y-4">
-              <Card className={glowCard}>
-                <CardContent className="p-4 space-y-3 text-sm">
-                  <div className="flex justify-between"><span className="text-muted-foreground">Người dùng</span><span className="font-medium">{viewingInvoice.user}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Gói</span><span className="font-medium">{viewingInvoice.plan}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Phương thức</span><span className="font-medium">{viewingInvoice.method}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Số tiền</span><span className="font-medium">{viewingInvoice.amount.toLocaleString('vi-VN')}đ</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Ngày tạo</span><span className="font-medium">{viewingInvoice.createdAt}</span></div>
-                  <div className="flex justify-between items-center"><span className="text-muted-foreground">Trạng thái</span>{invoiceStatusBadge(viewingInvoice.status)}</div>
-                </CardContent>
-              </Card>
-              <p className="text-xs text-muted-foreground">
-                TODO: gọi API GET /admin/finance/invoices/:id để lấy chi tiết hóa đơn thật.
-              </p>
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
+function DetailRow({
+  label,
+  value,
+  mono = false,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4 rounded-xl border border-border p-3">
+      <span className="shrink-0 text-muted-foreground">{label}</span>
+      <span
+        className={`break-all text-right font-medium ${mono ? 'font-mono text-xs' : ''
+          }`}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function PaginationFooter({
+  page,
+  pageSize,
+  totalItems,
+  totalPages,
+  onPageChange,
+  label,
+}: {
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  label: string;
+}) {
+  return (
+    <div className="mt-4 flex flex-col gap-3 px-1 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm text-muted-foreground">
+        {(page - 1) * pageSize + 1}–
+        {Math.min(page * pageSize, totalItems)}/{totalItems} {label}
+      </p>
+
+      <div className="flex items-center gap-1">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8 w-8 p-0"
+          disabled={page === 1}
+          onClick={() => onPageChange(Math.max(1, page - 1))}
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+
+        {Array.from({ length: totalPages }, (_, index) => index + 1)
+          .slice(Math.max(0, page - 3), Math.max(5, page + 2))
+          .map((pageNumber) => (
+            <Button
+              key={pageNumber}
+              type="button"
+              variant={pageNumber === page ? 'default' : 'outline'}
+              size="sm"
+              className="h-8 min-w-8 px-2 text-xs"
+              onClick={() => onPageChange(pageNumber)}
+            >
+              {pageNumber}
+            </Button>
+          ))}
+
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8 w-8 p-0"
+          disabled={page === totalPages}
+          onClick={() =>
+            onPageChange(Math.min(totalPages, page + 1))
+          }
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
     </div>
   );
 }
