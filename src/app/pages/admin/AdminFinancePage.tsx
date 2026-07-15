@@ -195,88 +195,9 @@ interface InvoiceRecord {
 }
 
 /* ========================================================================
- * Mock data — TODO: thay bằng API thật khi backend sẵn sàng
+ * Dữ liệu finance sẽ được nối từ API thật khi backend sẵn sàng.
+ * Hiện tại giữ trạng thái null để UI hiển thị empty state thay vì mock.
  * ==================================================================== */
-const revenueTrend: LineChartPoint[] = [
-  { key: '01', label: 'T1', value: 32_000_000 },
-  { key: '02', label: 'T2', value: 41_500_000 },
-  { key: '03', label: 'T3', value: 38_200_000 },
-  { key: '04', label: 'T4', value: 52_800_000 },
-  { key: '05', label: 'T5', value: 61_000_000 },
-  { key: '06', label: 'T6', value: 56_200_000 },
-];
-
-const topPlans = [
-  { name: 'Premium 1 tháng', sold: 214 },
-  { name: 'Premium 1 năm', sold: 128 },
-  { name: 'Premium 3 tháng', sold: 96 },
-  { name: 'Free', sold: 412 },
-];
-
-const paymentMethodStats: { method: PaymentMethod; count: number }[] = [
-  { method: 'VNPay', count: 245 },
-  { method: 'MoMo QR', count: 168 },
-];
-
-const initialPlans: StoragePlan[] = [
-  {
-    id: 'PLAN-001',
-    name: 'Free',
-    price: 0,
-    storage: '2 GB',
-    cycle: 'Không giới hạn',
-    badgeColor: 'secondary',
-    status: 'active',
-    permissions: ['Truy cập tài liệu cơ bản', 'Giới hạn 10 lượt chat AI/ngày'],
-  },
-  {
-    id: 'PLAN-002',
-    name: 'Premium 1 tháng',
-    price: 99_000,
-    storage: '50 GB',
-    cycle: '30 ngày',
-    badgeColor: 'default',
-    status: 'active',
-    permissions: ['Truy cập đầy đủ tài liệu', 'Chat AI không giới hạn', 'Ưu tiên hỗ trợ'],
-  },
-  {
-    id: 'PLAN-003',
-    name: 'Premium 3 tháng',
-    price: 199_000,
-    storage: '100 GB',
-    cycle: '90 ngày',
-    badgeColor: 'default',
-    status: 'active',
-    permissions: ['Truy cập đầy đủ tài liệu', 'Chat AI không giới hạn', 'Ưu tiên hỗ trợ'],
-  },
-  {
-    id: 'PLAN-004',
-    name: 'Premium 1 năm',
-    price: 899_000,
-    storage: '200 GB',
-    cycle: '365 ngày',
-    badgeColor: 'outline',
-    status: 'inactive',
-    permissions: ['Truy cập đầy đủ tài liệu', 'Chat AI không giới hạn', 'Ưu tiên hỗ trợ', 'Huy hiệu VIP'],
-  },
-];
-
-const initialPayments: PaymentTransaction[] = [
-  { id: 'TXN-001', code: 'TXN250706001', user: 'nguyen.vana@example.com', plan: 'Premium 1 tháng', method: 'VNPay', amount: 99_000, paidAt: '06/07/2026 10:30', status: 'success' },
-  { id: 'TXN-002', code: 'TXN250706002', user: 'tran.thib@example.com', plan: 'Premium 3 tháng', method: 'MoMo QR', amount: 199_000, paidAt: '06/07/2026 10:25', status: 'success' },
-  { id: 'TXN-003', code: 'TXN250706003', user: 'le.vanc@example.com', plan: 'Premium 1 tháng', method: 'VNPay', amount: 99_000, paidAt: '06/07/2026 10:15', status: 'failed' },
-  { id: 'TXN-004', code: 'TXN250706004', user: 'pham.td@example.com', plan: 'Premium 1 năm', method: 'MoMo QR', amount: 899_000, paidAt: '06/07/2026 10:05', status: 'success' },
-  { id: 'TXN-005', code: 'TXN250706005', user: 'hoang.ma@example.com', plan: 'Premium 1 tháng', method: 'VNPay', amount: 99_000, paidAt: '06/07/2026 09:58', status: 'pending' },
-  { id: 'TXN-006', code: 'TXN250706006', user: 'do.minh@example.com', plan: 'Premium 3 tháng', method: 'MoMo QR', amount: 199_000, paidAt: '06/07/2026 09:40', status: 'success' },
-];
-
-const initialInvoices: InvoiceRecord[] = [
-  { id: 'INV-001', code: 'HD250706001', user: 'nguyen.vana@example.com', plan: 'Premium 1 tháng', method: 'VNPay', amount: 99_000, createdAt: '06/07/2026', status: 'paid' },
-  { id: 'INV-002', code: 'HD250706002', user: 'tran.thib@example.com', plan: 'Premium 3 tháng', method: 'MoMo QR', amount: 199_000, createdAt: '06/07/2026', status: 'paid' },
-  { id: 'INV-003', code: 'HD250706003', user: 'le.vanc@example.com', plan: 'Premium 1 tháng', method: 'VNPay', amount: 99_000, createdAt: '06/07/2026', status: 'unpaid' },
-  { id: 'INV-004', code: 'HD250706004', user: 'pham.td@example.com', plan: 'Premium 1 năm', method: 'MoMo QR', amount: 899_000, createdAt: '05/07/2026', status: 'paid' },
-  { id: 'INV-005', code: 'HD250706005', user: 'hoang.ma@example.com', plan: 'Premium 1 tháng', method: 'VNPay', amount: 99_000, createdAt: '05/07/2026', status: 'cancelled' },
-];
 
 const PLAN_PAGE_SIZE = 5;
 const PAYMENT_PAGE_SIZE = 5;
@@ -296,22 +217,27 @@ export function AdminFinancePage() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'storage' | 'payment' | 'invoice'>('dashboard');
 
   /* ------------------------------- Dashboard ------------------------------- */
-  const totalRevenue = useMemo(() => revenueTrend.reduce((sum, item) => sum + item.value, 0), []);
-  const totalTransactions = initialPayments.length;
-  const successPayments = initialPayments.filter((p) => p.status === 'success').length;
-  const proUsers = 128;
+  const [revenueTrend] = useState<LineChartPoint[] | null>(null);
+  const [topPlans] = useState<{ name: string; sold: number }[] | null>(null);
+  const [paymentMethodStats] = useState<{ method: PaymentMethod; count: number }[] | null>(null);
+  const [payments] = useState<PaymentTransaction[] | null>(null);
+  const [invoices] = useState<InvoiceRecord[] | null>(null);
+
+  const totalRevenue = useMemo(() => (revenueTrend ?? []).reduce((sum, item) => sum + item.value, 0), [revenueTrend]);
+  const totalTransactions = useMemo(() => (payments ?? []).length, [payments]);
+  const successPayments = useMemo(() => (payments ?? []).filter((p) => p.status === 'success').length, [payments]);
 
   const dashboardStats = [
-    { title: 'Tổng doanh thu', value: formatCurrency(totalRevenue), icon: Wallet, description: '6 tháng gần nhất' },
-    { title: 'Tổng giao dịch', value: totalTransactions.toLocaleString('vi-VN'), icon: ArrowLeftRight, description: 'Trong hệ thống' },
-    { title: 'Tổng thanh toán', value: successPayments.toLocaleString('vi-VN'), icon: CreditCard, description: 'Giao dịch thành công' },
-    { title: 'Người dùng Pro', value: proUsers.toLocaleString('vi-VN'), icon: Crown, description: 'Đang dùng gói trả phí' },
+    { title: 'Tổng doanh thu', value: revenueTrend ? formatCurrency(totalRevenue) : '—', icon: Wallet, description: '6 tháng gần nhất' },
+    { title: 'Tổng giao dịch', value: payments ? totalTransactions.toLocaleString('vi-VN') : '—', icon: ArrowLeftRight, description: 'Trong hệ thống' },
+    { title: 'Tổng thanh toán', value: payments ? successPayments.toLocaleString('vi-VN') : '—', icon: CreditCard, description: 'Giao dịch thành công' },
+    { title: 'Người dùng Pro', value: '—', icon: Crown, description: 'Đang dùng gói trả phí' },
   ];
 
-  const totalPaymentCount = paymentMethodStats.reduce((sum, item) => sum + item.count, 0);
+  const totalPaymentCount = (paymentMethodStats ?? []).reduce((sum, item) => sum + item.count, 0);
 
   /* ------------------------------- Gói lưu trữ ------------------------------- */
-  const [plans, setPlans] = useState<StoragePlan[]>(initialPlans);
+  const [plans, setPlans] = useState<StoragePlan[] | null>(null);
   const [planSearch, setPlanSearch] = useState('');
   const [planPage, setPlanPage] = useState(1);
   const [planDialogOpen, setPlanDialogOpen] = useState(false);
@@ -319,7 +245,7 @@ export function AdminFinancePage() {
   const [planForm, setPlanForm] = useState(emptyPlanForm);
 
   const filteredPlans = useMemo(
-    () => plans.filter((p) => normalizeSearchText(p.name).includes(normalizeSearchText(planSearch))),
+    () => (plans ?? []).filter((p) => normalizeSearchText(p.name).includes(normalizeSearchText(planSearch))),
     [plans, planSearch],
   );
   const totalPlanPages = Math.max(1, Math.ceil(filteredPlans.length / PLAN_PAGE_SIZE));
@@ -362,9 +288,9 @@ export function AdminFinancePage() {
 
     // TODO: gọi API POST /admin/finance/plans (thêm) hoặc PUT /admin/finance/plans/:id (sửa)
     if (editingPlan) {
-      setPlans((prev) => prev.map((p) => (p.id === editingPlan.id ? payload : p)));
+      setPlans((prev) => (prev ?? []).map((p) => (p.id === editingPlan.id ? payload : p)));
     } else {
-      setPlans((prev) => [payload, ...prev]);
+      setPlans((prev) => [payload, ...(prev ?? [])]);
     }
     setPlanDialogOpen(false);
   };
@@ -372,7 +298,7 @@ export function AdminFinancePage() {
   const handleDeletePlan = (id: string) => {
     // TODO: gọi API DELETE /admin/finance/plans/:id
     if (confirm('Bạn có chắc muốn xóa gói này?')) {
-      setPlans((prev) => prev.filter((p) => p.id !== id));
+      setPlans((prev) => (prev ?? []).filter((p) => p.id !== id));
     }
   };
 
@@ -385,13 +311,13 @@ export function AdminFinancePage() {
 
   const filteredPayments = useMemo(() => {
     const search = normalizeSearchText(paymentSearch);
-    return initialPayments.filter((p) => {
+    return (payments ?? []).filter((p) => {
       const matchesSearch = !search || normalizeSearchText(p.code).includes(search) || normalizeSearchText(p.user).includes(search);
       const matchesMethod = !paymentMethodFilter || p.method === paymentMethodFilter;
       const matchesStatus = !paymentStatusFilter || p.status === paymentStatusFilter;
       return matchesSearch && matchesMethod && matchesStatus;
     });
-  }, [paymentSearch, paymentMethodFilter, paymentStatusFilter]);
+  }, [payments, paymentSearch, paymentMethodFilter, paymentStatusFilter]);
 
   const totalPaymentPages = Math.max(1, Math.ceil(filteredPayments.length / PAYMENT_PAGE_SIZE));
   const paginatedPayments = filteredPayments.slice((paymentPage - 1) * PAYMENT_PAGE_SIZE, paymentPage * PAYMENT_PAGE_SIZE);
@@ -410,12 +336,12 @@ export function AdminFinancePage() {
 
   const filteredInvoices = useMemo(() => {
     const search = normalizeSearchText(invoiceSearch);
-    return initialInvoices.filter((inv) => {
+    return (invoices ?? []).filter((inv) => {
       const matchesSearch = !search || normalizeSearchText(inv.code).includes(search) || normalizeSearchText(inv.user).includes(search);
       const matchesStatus = !invoiceStatusFilter || inv.status === invoiceStatusFilter;
       return matchesSearch && matchesStatus;
     });
-  }, [invoiceSearch, invoiceStatusFilter]);
+  }, [invoices, invoiceSearch, invoiceStatusFilter]);
 
   const totalInvoicePages = Math.max(1, Math.ceil(filteredInvoices.length / INVOICE_PAGE_SIZE));
   const paginatedInvoices = filteredInvoices.slice((invoicePage - 1) * INVOICE_PAGE_SIZE, invoicePage * INVOICE_PAGE_SIZE);
@@ -497,7 +423,7 @@ export function AdminFinancePage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <RevenueLineChart data={revenueTrend} />
+                <RevenueLineChart data={revenueTrend ?? []} />
               </CardContent>
             </Card>
 
@@ -514,17 +440,21 @@ export function AdminFinancePage() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                {topPlans.map((plan, index) => (
-                  <div key={plan.name} className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-muted/50 p-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">
-                        {index + 1}
-                      </span>
-                      <span className="truncate text-sm font-semibold">{plan.name}</span>
+                {(topPlans ?? []).length > 0 ? (
+                  (topPlans ?? []).map((plan, index) => (
+                    <div key={plan.name} className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-muted/50 p-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">
+                          {index + 1}
+                        </span>
+                        <span className="truncate text-sm font-semibold">{plan.name}</span>
+                      </div>
+                      <span className="text-sm text-muted-foreground shrink-0">{plan.sold} lượt</span>
                     </div>
-                    <span className="text-sm text-muted-foreground shrink-0">{plan.sold} lượt</span>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">Chưa có dữ liệu gói bán chạy.</p>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -542,20 +472,24 @@ export function AdminFinancePage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {paymentMethodStats.map((item) => {
-                const ratio = totalPaymentCount ? Math.round((item.count / totalPaymentCount) * 100) : 0;
-                return (
-                  <div key={item.method} className="space-y-1.5">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-semibold">{item.method}</span>
-                      <span className="text-muted-foreground">{item.count} giao dịch · {ratio}%</span>
+              {(paymentMethodStats ?? []).length > 0 ? (
+                (paymentMethodStats ?? []).map((item) => {
+                  const ratio = totalPaymentCount ? Math.round((item.count / totalPaymentCount) * 100) : 0;
+                  return (
+                    <div key={item.method} className="space-y-1.5">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-semibold">{item.method}</span>
+                        <span className="text-muted-foreground">{item.count} giao dịch · {ratio}%</span>
+                      </div>
+                      <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
+                        <div className="h-full rounded-full bg-primary" style={{ width: `${ratio}%` }} />
+                      </div>
                     </div>
-                    <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
-                      <div className="h-full rounded-full bg-primary" style={{ width: `${ratio}%` }} />
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              ) : (
+                <p className="text-sm text-muted-foreground">Chưa có dữ liệu thống kê thanh toán.</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -599,7 +533,7 @@ export function AdminFinancePage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedPlans.map((plan) => (
+                    {(paginatedPlans.length > 0 ? paginatedPlans : []).map((plan) => (
                       <TableRow key={plan.id} className="hover:bg-muted/10 border-b border-border last:border-0 transition-colors">
                         <TableCell className="py-4 px-6 font-medium">
                           <Badge variant={plan.badgeColor}>{plan.name}</Badge>
@@ -637,7 +571,7 @@ export function AdminFinancePage() {
                     {paginatedPlans.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                          Không tìm thấy gói lưu trữ nào.
+                          {plans === null ? 'Chưa có dữ liệu gói lưu trữ từ API.' : 'Không tìm thấy gói lưu trữ nào.'}
                         </TableCell>
                       </TableRow>
                     )}
@@ -767,7 +701,7 @@ export function AdminFinancePage() {
                     {paginatedPayments.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                          Không tìm thấy giao dịch nào.
+                          {payments === null ? 'Chưa có dữ liệu giao dịch từ API.' : 'Không tìm thấy giao dịch nào.'}
                         </TableCell>
                       </TableRow>
                     )}
@@ -870,7 +804,7 @@ export function AdminFinancePage() {
                     {paginatedInvoices.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                          Không tìm thấy hóa đơn nào.
+                          {invoices === null ? 'Chưa có dữ liệu hóa đơn từ API.' : 'Không tìm thấy hóa đơn nào.'}
                         </TableCell>
                       </TableRow>
                     )}

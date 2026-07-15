@@ -13,7 +13,7 @@ import {
   Shield,
   TrendingUp,
   Users,
-  MoreVertical,
+  Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
@@ -22,13 +22,12 @@ import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Avatar, AvatarFallback } from '../../components/ui/avatar';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../components/ui/dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../components/ui/dropdown-menu';
 import {
+  deleteUser,
   getDocuments,
   getDocumentVersions,
   getMe,
   getUsers,
-  lockUser,
   type DocumentItem,
   type DocumentVersionItem,
   type User,
@@ -448,20 +447,23 @@ const pageMode = location.pathname.includes('/admin/users')
     return Array.from(types).sort((a, b) => a.localeCompare(b, 'vi'));
   }, [documents]);
 
-  const handleLockUser = async (user: User, duration: '3d' | '7d' | 'permanent') => {
+  const handleDeleteUser = async (user: User) => {
     if (!user.id) return;
     if (user.id === currentUser?.id) {
-      toast.error('Không thể khóa chính tài khoản admin đang đăng nhập.');
+      toast.error('Không thể xóa chính tài khoản admin đang đăng nhập.');
       return;
     }
 
+    const confirmed = window.confirm(`Bạn có chắc muốn xóa tài khoản "${user.fullName || user.email || user.id}"?`);
+    if (!confirmed) return;
+
     setActionLoading(user.id);
     try {
-      await lockUser(user.id, duration);
-      toast.success('Đã khóa tài khoản');
+      await deleteUser(user.id);
+      toast.success('Đã xóa tài khoản');
       await loadAdminData();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Không thể khóa tài khoản');
+      toast.error(error instanceof Error ? error.message : 'Không thể xóa tài khoản');
     } finally {
       setActionLoading(null);
     }
@@ -857,11 +859,6 @@ const pageMode = location.pathname.includes('/admin/users')
                         <TableCell className="py-4 px-4 text-muted-foreground">{user.email}</TableCell>
                         <TableCell className="py-4 px-4 space-y-2">
                           <Badge>{user.role || 'USER'}</Badge>
-                          {(user.isLocked || user.lockedUntil) && (
-                            <Badge variant="destructive" className="uppercase">
-                              {user.lockedUntil ? `Đã khóa đến ${formatDate(user.lockedUntil)}` : 'Khóa vĩnh viễn'}
-                            </Badge>
-                          )}
                         </TableCell>
                         <TableCell className="py-4 px-4">
                           <Badge variant={user.isVerified ? 'default' : 'secondary'}>
@@ -871,30 +868,16 @@ const pageMode = location.pathname.includes('/admin/users')
                         <TableCell className="py-4 px-4 text-muted-foreground">{formatFileSize(user.usedStorage)}</TableCell>
                         <TableCell className="py-4 px-4 text-muted-foreground">{formatDate(user.createdAt)}</TableCell>
                         <TableCell className="py-4 px-6 text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="gap-2"
-                                disabled={actionLoading === user.id || user.id === currentUser?.id}
-                              >
-                                <MoreVertical className="w-4 h-4" />
-                                Khóa tài khoản
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-52">
-                              <DropdownMenuItem disabled={user.id === currentUser?.id} onSelect={() => handleLockUser(user, '3d')}>
-                                Khóa 3 ngày
-                              </DropdownMenuItem>
-                              <DropdownMenuItem disabled={user.id === currentUser?.id} onSelect={() => handleLockUser(user, '7d')}>
-                                Khóa 7 ngày
-                              </DropdownMenuItem>
-                              <DropdownMenuItem disabled={user.id === currentUser?.id} onSelect={() => handleLockUser(user, 'permanent')}>
-                                Khóa vĩnh viễn
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8 rounded-full p-0 text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700 dark:border-rose-500/30 dark:hover:bg-rose-500/10"
+                            disabled={actionLoading === user.id || user.id === currentUser?.id}
+                            onClick={() => { void handleDeleteUser(user); }}
+                            aria-label="Xóa tài khoản"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
