@@ -1251,7 +1251,7 @@ export function MainLayout() {
 
     {
       path: "/profile",
-      label: "Settings",
+      label: "Cài đặt",
       icon: Settings,
     },
   ];

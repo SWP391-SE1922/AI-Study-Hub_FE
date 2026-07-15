@@ -72,7 +72,7 @@ export function AuthLayout() {
         {/* faint ambient glow behind the form so it doesn't feel flat on light bg */}
         <div className="pointer-events-none absolute top-1/4 left-1/3 w-72 h-72 bg-indigo-400/10 dark:bg-indigo-500/10 rounded-full blur-3xl" />
         <div className="pointer-events-none absolute bottom-1/4 right-1/4 w-64 h-64 bg-fuchsia-400/10 dark:bg-fuchsia-500/10 rounded-full blur-3xl" />
-        <div className="relative z-10 w-full auth-fade-up">
+        <div className="relative z-10 flex w-full justify-center auth-fade-up">
           <Outlet />
         </div>
       </div>
