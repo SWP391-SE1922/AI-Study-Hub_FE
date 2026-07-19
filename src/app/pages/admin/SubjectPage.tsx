@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Tag, Calendar, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
+import { Plus, Edit, Trash2, BookOpen, Calendar, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Card, CardContent } from '../../components/ui/card';
@@ -15,18 +15,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
 import { Badge } from '../../components/ui/badge';
-import { apiRequest, restoreCategory } from '../../services/api';
+import { apiRequest, restoreSubject } from '../../services/api';
 import { toast } from 'sonner';
 
 const glowCard = 'bg-white rounded-3xl p-2 border border-[#121214]/5 shadow-sm transition-all duration-300 hover:shadow-md';
-
-interface Category {
-  id: string;
-  name: string;
-  description: string | null;
-  deletedAt?: string | null;
-  createdAt: string;
-}
 
 function normalizeSearchText(value: string) {
   return value
@@ -36,127 +28,147 @@ function normalizeSearchText(value: string) {
     .trim();
 }
 
-export function CategoryPage() {
-  const [categories, setCategories] = useState<Category[]>([]);
+// Khớp với schema thật của backend: POST/PUT /api/subjects yêu cầu name, code, description
+interface Subject {
+  id: string;
+  name: string;
+  code: string;
+  description: string | null;
+  deletedAt?: string | null;
+  createdAt: string;
+}
+
+export function SubjectPage() {
+  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 10;
-
-  // Dialog States
+  // Dialog states
   const [isOpen, setIsOpen] = useState(false);
   const [dialogLoading, setDialogLoading] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [name, setName] = useState('');
+  const [code, setCode] = useState('');
   const [description, setDescription] = useState('');
 
-  const fetchCategories = async () => {
+  const fetchSubjects = async () => {
     setLoading(true);
     try {
-      const data = await apiRequest('/categories');
-      setCategories(data.categories || data);
+      const data = await apiRequest('/subjects');
+      // Backend có thể trả thẳng mảng hoặc { subjects: [...] }, tuỳ response thực tế
+      setSubjects(Array.isArray(data) ? data : data.subjects || []);
     } catch (err: any) {
       console.error(err);
-      toast.error(err.message || 'Lỗi khi tải danh sách danh mục.');
+      toast.error(err.message || 'Lỗi khi tải danh sách môn học.');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchCategories();
+    fetchSubjects();
   }, []);
 
   const openAddDialog = () => {
-    setEditingCategory(null);
+    setEditingSubject(null);
     setName('');
+    setCode('');
     setDescription('');
     setIsOpen(true);
   };
 
-  const openEditDialog = (cat: Category) => {
-    setEditingCategory(cat);
-    setName(cat.name);
-    setDescription(cat.description || '');
+  const openEditDialog = (subject: Subject) => {
+    setEditingSubject(subject);
+    setName(subject.name);
+    setCode(subject.code || '');
+    setDescription(subject.description || '');
     setIsOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      toast.error('Vui lòng nhập tên danh mục!');
+      toast.error('Vui lòng nhập tên môn học!');
+      return;
+    }
+    if (!code.trim()) {
+      toast.error('Vui lòng nhập mã môn học!');
       return;
     }
 
     setDialogLoading(true);
     try {
-      const payload = { name, description };
-      if (editingCategory) {
-        await apiRequest(`/categories/${editingCategory.id}`, {
+      const payload = { name: name.trim(), code: code.trim(), description };
+      if (editingSubject) {
+        await apiRequest(`/subjects/${editingSubject.id}`, {
           method: 'PUT',
           body: JSON.stringify(payload),
         });
-        toast.success('Cập nhật danh mục thành công!');
+        toast.success('Cập nhật môn học thành công!');
       } else {
-        await apiRequest('/categories', {
+        await apiRequest('/subjects', {
           method: 'POST',
           body: JSON.stringify(payload),
         });
-        toast.success('Tạo danh mục mới thành công!');
+        toast.success('Tạo môn học mới thành công!');
       }
       setIsOpen(false);
-      fetchCategories();
+      fetchSubjects();
     } catch (err: any) {
-      toast.error(err.message || 'Lỗi khi lưu danh mục.');
+      toast.error(err.message || 'Lỗi khi lưu môn học.');
     } finally {
       setDialogLoading(false);
     }
   };
 
-  const handleDelete = async (catId: string) => {
-    if (confirm('Xóa mềm danh mục này? Admin vẫn xem được và có thể khôi phục.')) {
+  const handleDelete = async (subjectId: string) => {
+    if (confirm('Xóa mềm môn học này? Admin vẫn xem được và có thể khôi phục.')) {
       try {
-        await apiRequest(`/categories/${catId}`, {
+        await apiRequest(`/subjects/${subjectId}`, {
           method: 'DELETE',
         });
-        toast.success('Đã xóa mềm danh mục');
-        fetchCategories();
+        toast.success('Đã xóa mềm môn học');
+        fetchSubjects();
       } catch (err: any) {
-        toast.error(err.message || 'Lỗi khi xóa danh mục.');
+        toast.error(err.message || 'Lỗi khi xóa môn học.');
       }
     }
   };
 
-  const handleRestore = async (catId: string) => {
+  const handleRestore = async (subjectId: string) => {
     try {
-      await restoreCategory(catId);
-      toast.success('Đã khôi phục danh mục');
-      fetchCategories();
+      await restoreSubject(subjectId);
+      toast.success('Đã khôi phục môn học');
+      fetchSubjects();
     } catch (err: any) {
-      toast.error(err.message || 'Lỗi khi khôi phục danh mục.');
+      toast.error(err.message || 'Lỗi khi khôi phục môn học.');
     }
   };
 
-  const filteredCategories = categories.filter((c) =>
-    normalizeSearchText(c.name).includes(normalizeSearchText(search)),
+  const normalizedSearch = normalizeSearchText(search);
+  const filteredSubjects = subjects.filter((s) =>
+    normalizeSearchText(s.name).includes(normalizedSearch) ||
+    normalizeSearchText(s.code || '').includes(normalizedSearch) ||
+    normalizeSearchText(s.description || '').includes(normalizedSearch),
   );
-  const totalPages = Math.max(1, Math.ceil(filteredCategories.length / PAGE_SIZE));
-  const paginatedCategories = filteredCategories.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(filteredSubjects.length / PAGE_SIZE));
+  const paginatedSubjects = filteredSubjects.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   return (
     <div className="space-y-8 text-[#121214] selection:bg-[#121214] selection:text-white">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 bg-[#121214] rounded-xl flex items-center justify-center shadow-sm">
-            <Tag className="w-6 h-6 text-white" />
+            <BookOpen className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold">Quản lý danh mục tài liệu</h1>
-            <p className="text-muted-foreground mt-1">Danh sách các danh mục (Kinh tế, Lập trình v.v.).</p>
+            <h1 className="text-3xl font-bold">Quản lý môn học</h1>
+            <p className="text-muted-foreground mt-1">Danh sách các môn học.</p>
           </div>
         </div>
         <Button onClick={openAddDialog} size="sm" className="gap-2 bg-[#121214] hover:bg-stone-800 text-white rounded-xl">
           <Plus className="w-4 h-4" />
-          Thêm danh mục
+          Thêm môn học
         </Button>
       </div>
 
@@ -168,8 +180,8 @@ export function CategoryPage() {
               type="text"
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              placeholder="Tìm kiếm danh mục..."
-              aria-label="Tìm kiếm danh mục"
+              placeholder="Tìm kiếm theo tên hoặc mã môn học..."
+              aria-label="Tìm kiếm môn học"
               className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-sky-400/40"
             />
           </div>
@@ -182,7 +194,8 @@ export function CategoryPage() {
             <Table>
               <TableHeader className="bg-muted/40 border-b border-border">
                 <TableRow>
-                  <TableHead className="py-4 px-6">Tên danh mục</TableHead>
+                  <TableHead className="py-4 px-6">Tên môn học</TableHead>
+                  <TableHead className="py-4 px-4">Mã môn học</TableHead>
                   <TableHead className="py-4 px-4">Mô tả</TableHead>
                   <TableHead className="py-4 px-4">Trạng thái</TableHead>
                   <TableHead className="py-4 px-4">Ngày tạo</TableHead>
@@ -192,27 +205,32 @@ export function CategoryPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
-                      Đang tải danh sách danh mục...
+                    <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                      Đang tải danh sách môn học...
                     </TableCell>
                   </TableRow>
-                ) : filteredCategories.length === 0 ? (
+                ) : filteredSubjects.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
-                      Không tìm thấy danh mục nào.
+                    <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                      Không tìm thấy môn học nào.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  paginatedCategories.map((cat) => (
-                    <TableRow key={cat.id} className={`hover:bg-muted/10 border-b border-border last:border-0 transition-colors ${cat.deletedAt ? 'opacity-60' : ''}`}>
+                  paginatedSubjects.map((subject) => (
+                    <TableRow key={subject.id} className={`hover:bg-muted/10 border-b border-border last:border-0 transition-colors ${subject.deletedAt ? 'opacity-60' : ''}`}>
                       <TableCell className="py-4 px-6 font-semibold text-[#121214] text-sm">
-                        {cat.name}
+                        {subject.name}
+                      </TableCell>
+                      <TableCell className="py-4 px-4 text-sm">
+                        <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400">
+                          {subject.code || '—'}
+                        </span>
                       </TableCell>
                       <TableCell className="py-4 px-4 text-muted-foreground text-sm max-w-sm truncate">
-                        {cat.description || 'Chưa có mô tả'}
+                        {subject.description || 'Chưa có mô tả'}
                       </TableCell>
                       <TableCell className="py-4 px-4">
-                        {cat.deletedAt ? (
+                        {subject.deletedAt ? (
                           <Badge variant="destructive">Đã xóa</Badge>
                         ) : (
                           <Badge variant="secondary">Đang dùng</Badge>
@@ -221,16 +239,16 @@ export function CategoryPage() {
                       <TableCell className="py-4 px-4 text-muted-foreground text-xs">
                         <div className="flex items-center gap-1.5">
                           <Calendar className="w-3.5 h-3.5" />
-                          {new Date(cat.createdAt).toLocaleDateString('vi-VN')}
+                          {subject.createdAt ? new Date(subject.createdAt).toLocaleDateString('vi-VN') : '—'}
                         </div>
                       </TableCell>
                       <TableCell className="py-4 px-6 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {cat.deletedAt ? (
+                          {subject.deletedAt ? (
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => handleRestore(cat.id)}
+                              onClick={() => handleRestore(subject.id)}
                               className="h-8 w-8 rounded-full p-0 text-emerald-600 hover:text-emerald-700"
                               title="Khôi phục"
                             >
@@ -241,7 +259,7 @@ export function CategoryPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => openEditDialog(cat)}
+                                onClick={() => openEditDialog(subject)}
                                 className="h-8 w-8 rounded-full p-0 text-amber-600 hover:text-amber-700"
                               >
                                 <Edit className="w-4 h-4" />
@@ -249,7 +267,7 @@ export function CategoryPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => handleDelete(cat.id)}
+                                onClick={() => handleDelete(subject.id)}
                                 className="h-8 w-8 rounded-full p-0 text-destructive hover:text-destructive/80"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -264,10 +282,10 @@ export function CategoryPage() {
               </TableBody>
             </Table>
           </div>
-          {filteredCategories.length > 0 && (
+          {filteredSubjects.length > 0 && (
             <div className="flex items-center justify-between mt-4 px-1">
               <p className="text-sm text-muted-foreground">
-                {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filteredCategories.length)}/{filteredCategories.length} danh mục
+                {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filteredSubjects.length)}/{filteredSubjects.length} môn học
               </p>
               <div className="flex items-center gap-1">
                 <Button
@@ -304,33 +322,45 @@ export function CategoryPage() {
         <DialogContent className="sm:max-w-[450px] rounded-3xl p-6 border-border bg-background">
           <DialogHeader className="mb-4">
             <DialogTitle className="text-xl font-bold text-foreground">
-              {editingCategory ? 'Sửa danh mục' : 'Thêm danh mục mới'}
+              {editingSubject ? 'Sửa môn học' : 'Thêm môn học mới'}
             </DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">
-              Điền các thông tin danh mục phân loại tài liệu dưới đây.
+              Điền thông tin môn học dưới đây.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="catName" className="text-sm font-semibold text-foreground">Tên danh mục *</Label>
+              <Label htmlFor="subjectName" className="text-sm font-semibold text-foreground">Tên môn học *</Label>
               <Input
-                id="catName"
+                id="subjectName"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Ví dụ: Công nghệ phần mềm"
+                placeholder="Ví dụ: Cấu trúc dữ liệu và giải thuật"
                 required
                 className="rounded-xl"
               />
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="catDesc" className="text-sm font-semibold text-foreground">Mô tả danh mục</Label>
+              <Label htmlFor="subjectCode" className="text-sm font-semibold text-foreground">Mã môn học *</Label>
+              <Input
+                id="subjectCode"
+                value={code}
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                placeholder="Ví dụ: PRJ301"
+                required
+                className="rounded-xl"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="subjectDesc" className="text-sm font-semibold text-foreground">Mô tả môn học</Label>
               <Textarea
-                id="catDesc"
+                id="subjectDesc"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Mô tả ngắn gọn về danh mục này..."
+                placeholder="Mô tả ngắn gọn về môn học này..."
                 className="min-h-[100px] rounded-xl"
               />
             </div>
@@ -349,4 +379,4 @@ export function CategoryPage() {
     </div>
   );
 }
-export default CategoryPage;
+export default SubjectPage;

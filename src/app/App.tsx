@@ -5,30 +5,48 @@ import { Toaster } from './components/ui/sonner';
 
 // Pages
 import { LandingPage } from './pages/LandingPage';
-import { LoginPage } from './pages/auth/LoginPage';
-import { RegisterPage } from './pages/auth/RegisterPage';
+import { AuthPage } from './pages/auth/AuthPage';
 import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
-import { DashboardPage }  from './pages/DashboardPage';
+import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
+import { VerifyEmailPage } from './pages/auth/VerifyEmailPage';
+import { DashboardPage } from './pages/DashboardPage';
 import { DocumentsPage } from './pages/documents/DocumentsPage';
 import { DocumentDetailPage } from './pages/documents/DocumentDetailPage';
-import { MyDocumentsPage } from './pages/documents/MyDocumentsPage';
-import { AIChat } from './pages/AIChat';
+import { PublicDocumentsPage } from './pages/documents/PublicDocumentsPage'; // <-- Import trang mới ở đây
 import { ProfilePage } from './pages/ProfilePage';
-import { AdminDashboardPage } from './pages/admin/adminDashboardPage';
-import { UserPage } from './pages/admin/adminUser';
-import { DocumentPage } from './pages/admin/adminDocument';
-import { AIChatPage } from './pages/admin/adminAIChat';
+import { ChatPage } from './pages/ChatPage';
+import { TransactionHistoryPage } from './pages/TransactionHistoryPage';
+import { PaymentResult } from './pages/PaymentResult';
+import { PaymentStatusPage } from './pages/PaymentStatusPage';
+import { AdminPage } from './pages/admin/AdminPage';
 import { CategoryPage } from './pages/admin/adminCategory';
+import { SubjectPage } from './pages/admin/SubjectPage';
+import { AdminDocumentDetailPage } from './pages/admin/AdminDocumentDetailPage';
+import { AdminFinancePage } from './pages/admin/AdminFinancePage';
+import { AdminPlansPage } from './pages/admin/AdminPlansPage';
 
-// Layout
+// Layouts
 import { MainLayout } from './components/layout/MainLayout';
 import { AuthLayout } from './components/layout/AuthLayout';
 import { AdminLayout } from './components/layout/AdminLayout';
-function ProtectedWrapper({
-  isAuthenticated,
-}: {
-  isAuthenticated: boolean;
-}) {
+import { CustomCursor } from './components/CustomCursor';
+import { CommandPalette } from './components/CommandPalette';
+import AiChatWidget from './components/ai/AiChatWidget';
+
+function readStoredRole() {
+  try {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    return user?.role || 'USER';
+  } catch {
+    return 'USER';
+  }
+}
+
+function getDefaultHomePath() {
+  return readStoredRole() === 'ADMIN' ? '/admin' : '/documents';
+}
+
+function ProtectedWrapper({ isAuthenticated }: { isAuthenticated: boolean }) {
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
@@ -36,33 +54,29 @@ function ProtectedWrapper({
   return <Outlet />;
 }
 
+function AdminOnlyWrapper({ isAuthenticated }: { isAuthenticated: boolean }) {
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (readStoredRole() !== 'ADMIN') {
+    return <Navigate to="/documents" replace />;
+  }
+
+  return <Outlet />;
+}
+
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return localStorage.getItem('isAuthenticated') === 'true';
+    return Boolean(localStorage.getItem('authToken')) || localStorage.getItem('isAuthenticated') === 'true';
   });
-  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
-    try {
-      const userStr = localStorage.getItem('user');
-      if (userStr) {
-        const parsed = JSON.parse(userStr);
-        return parsed.role === 'ADMIN';
-      }
-    } catch (e) {}
-    return false;
-  });
+  const [homePath, setHomePath] = useState<string>(() => getDefaultHomePath());
 
   useEffect(() => {
+    // Auth update listener
     const updateAuth = () => {
-      setIsAuthenticated(localStorage.getItem('isAuthenticated') === 'true');
-      try {
-        const userStr = localStorage.getItem('user');
-        if (userStr) {
-          const parsed = JSON.parse(userStr);
-          setIsAdmin(parsed.role === 'ADMIN');
-          return;
-        }
-      } catch (e) {}
-      setIsAdmin(false);
+      setIsAuthenticated(Boolean(localStorage.getItem('authToken')) || localStorage.getItem('isAuthenticated') === 'true');
+      setHomePath(getDefaultHomePath());
     };
 
     window.addEventListener('storage', updateAuth);
@@ -75,73 +89,51 @@ export default function App() {
   }, []);
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+      <CustomCursor />
       <BrowserRouter>
+        <CommandPalette />
         <Routes>
-          {/* Public */}
-          <Route
-            path="/"
-            element={
-              isAuthenticated ? (
-                <Navigate to={isAdmin ? "/admin/dashboard" : "/dashboard"} replace />
-              ) : (
-                <LandingPage />
-              )
-            }
-          />
+          <Route path="/" element={<LandingPage />} />
 
-          {/* Auth */}
+          {/* Payment result pages — public (không yêu cầu đăng nhập lại) */}
+          <Route path="/payment-status/success" element={<PaymentStatusPage status="success" />} />
+          <Route path="/payment-status/failed" element={<PaymentStatusPage status="failed" />} />
+          <Route path="/payment-status/error" element={<PaymentStatusPage status="error" />} />
+          <Route path="/payment-status/invalid" element={<PaymentStatusPage status="invalid" />} />
+          <Route path="/payment-result" element={<PaymentResult />} />
+
+          {/* New sliding AuthPage - No Layout needed */}
+          <Route path="/login" element={isAuthenticated ? <Navigate to={homePath} replace /> : <AuthPage initialMode="login" />} />
+          <Route path="/register" element={isAuthenticated ? <Navigate to={homePath} replace /> : <AuthPage initialMode="register" />} />
+
           <Route element={<AuthLayout />}>
-            <Route
-              path="/login"
-              element={
-                isAuthenticated ? (
-                  <Navigate to={isAdmin ? "/admin/dashboard" : "/dashboard"} replace />
-                ) : (
-                  <LoginPage />
-                )
-              }
-            />
-
-            <Route
-              path="/register"
-              element={
-                isAuthenticated ? (
-                  <Navigate to={isAdmin ? "/admin/dashboard" : "/dashboard"} replace />
-                ) : (
-                  <RegisterPage />
-                )
-              }
-            />
-
-            <Route
-              path="/forgot-password"
-              element={<ForgotPasswordPage />}
-            />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
           </Route>
 
-          <Route path="/admin" element={<AdminLayout />}>
-            <Route path="dashboard" element={<AdminDashboardPage />} />
-            <Route path="user" element={<UserPage />} />
-            <Route path="document" element={<DocumentPage />} />
-            <Route path="category" element={<CategoryPage />} />
-            <Route path="aichat" element={<AIChatPage />} />
-          </Route>
-
-          {/* Protected */}
           <Route element={<ProtectedWrapper isAuthenticated={isAuthenticated} />}>
             <Route element={<MainLayout />}>
-              <Route 
-                path="/dashboard" 
-                element={
-                  isAdmin ? <Navigate to="/admin/dashboard" replace /> : <DashboardPage />
-                } 
-              />
               <Route path="/documents" element={<DocumentsPage />} />
               <Route path="/documents/:id" element={<DocumentDetailPage />} />
-              <Route path="/my-documents" element={<MyDocumentsPage />} />
-              <Route path="/ai-chat" element={<AIChat />} />
               <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/transactions" element={<TransactionHistoryPage />} />
+              <Route path="/chat" element={<ChatPage />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
+            </Route>
+          </Route>
+
+          <Route element={<AdminOnlyWrapper isAuthenticated={isAuthenticated} />}>
+            <Route element={<AdminLayout />}>
+              <Route path="/admin" element={<AdminPage />} />
+              <Route path="/admin/users" element={<AdminPage />} />
+              <Route path="/admin/documents" element={<AdminPage />} />
+              <Route path="/admin/documents/:id" element={<AdminDocumentDetailPage />} />
+              <Route path="/admin/finance" element={<AdminFinancePage />} />
+              <Route path="/admin/plans" element={<AdminPlansPage />} />
+              <Route path="/admin/category" element={<CategoryPage />} />
+              <Route path="/admin/subjects" element={<SubjectPage />} />
             </Route>
           </Route>
 
@@ -149,6 +141,7 @@ export default function App() {
         </Routes>
 
         <Toaster />
+        {isAuthenticated && <AiChatWidget />}
       </BrowserRouter>
     </ThemeProvider>
   );
