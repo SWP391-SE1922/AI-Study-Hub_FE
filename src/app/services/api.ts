@@ -175,6 +175,12 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     : null;
 
   if (!response.ok) {
+    if (response.status === 401) {
+      logoutLocal();
+      if (window.location.pathname !== '/') {
+        window.location.href = '/';
+      }
+    }
     throw new Error(payload?.message || `Lỗi API ${response.status}`);
   }
 

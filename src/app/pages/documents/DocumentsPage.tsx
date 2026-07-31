@@ -184,12 +184,12 @@ export function DocumentsPage() {
       // 1. Tải tài nguyên (folders con và files con) của thư mục hiện tại từ DB
       const result = await getResources(currentFolderId);
       setFolders(result.folders || []);
-
+      
       const rawDocuments = result.files as unknown;
       const documentList = Array.isArray(rawDocuments)
         ? rawDocuments
         : extractArray<DocumentWithImage>(rawDocuments, 'documents');
-
+        
       setDocuments(documentList);
 
       // 2. Tải danh sách phẳng các folder để hiển thị ở Dropdown di chuyển
@@ -315,15 +315,15 @@ export function DocumentsPage() {
       formData.append('description', description.trim());
       // Mặc định luôn là riêng tư (Private)
       formData.append('isPublic', 'false');
-
+      
       // Gửi tên môn học do người dùng tự điền
       formData.append('subject', uploadSubject.trim());
-
+      
       // Nếu khớp với một môn học có sẵn, gửi thêm subjectId để liên kết
       if (matchedSubjectObj) {
         formData.append('subjectId', matchedSubjectObj.id);
       }
-
+      
       if (categoryId) formData.append('categoryId', categoryId);
       if (currentFolderId) formData.append('folderId', currentFolderId);
 
@@ -530,7 +530,7 @@ export function DocumentsPage() {
       {(() => {
         const filteredDocuments = documents.filter(doc => {
           if (search.trim()) {
-            return doc.title.toLowerCase().includes(search.toLowerCase()) ||
+            return doc.title.toLowerCase().includes(search.toLowerCase()) || 
                    (doc.subject && doc.subject.toLowerCase().includes(search.toLowerCase()));
           }
           return true;

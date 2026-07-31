@@ -50,7 +50,7 @@ export function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [resending, setResending] = useState(false);
-
+  
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [avatarMode, setAvatarMode] = useState<'upload' | 'url'>('upload');
   const [tempAvatarUrl, setTempAvatarUrl] = useState('');
@@ -227,10 +227,10 @@ export function ProfilePage() {
                   }
                 </div>
                 {!user?.isVerified && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
                     className="h-7 text-[10px] rounded-full bg-white/50 border-slate-200 hover:bg-white text-slate-600 shadow-sm"
                     onClick={handleResendVerification}
                     disabled={resending}
@@ -242,7 +242,7 @@ export function ProfilePage() {
               </div>
 
               {/* storage mini bar */}
-
+             
             </CardContent>
           </Card>
         </div>
@@ -409,7 +409,7 @@ export function ProfilePage() {
             <div className="p-6 border-b border-slate-100">
               <h3 className="text-lg font-bold text-slate-900">Thay đổi ảnh đại diện</h3>
             </div>
-
+            
             <div className="p-6 space-y-4">
               <div className="flex gap-2 p-1 bg-slate-100/50 rounded-lg">
                 <button
@@ -431,9 +431,9 @@ export function ProfilePage() {
               {avatarMode === 'upload' ? (
                 <div className="space-y-4">
                   <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleAvatarFileChange} />
-                  <Button
+                  <Button 
                     type="button"
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => fileInputRef.current?.click()} 
                     disabled={uploadingAvatar}
                     className="w-full h-12 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-bold border border-indigo-200 rounded-xl"
                   >
@@ -443,14 +443,14 @@ export function ProfilePage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <Input
+                  <Input 
                     type="url"
                     placeholder="Nhập đường dẫn hình ảnh..."
                     value={tempAvatarUrl}
                     onChange={(e) => setTempAvatarUrl(e.target.value)}
                     className="bg-white border-slate-200 text-slate-900"
                   />
-                  <Button
+                  <Button 
                     type="button"
                     onClick={() => { setFormData(prev => ({ ...prev, avatarUrl: tempAvatarUrl })); setShowAvatarModal(false); }}
                     className="w-full h-10 bg-indigo-500 hover:bg-indigo-600 text-white shadow-md shadow-indigo-500/20"

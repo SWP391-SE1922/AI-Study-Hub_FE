@@ -38,7 +38,7 @@ export function AdminLayout() {
 
   return (
     <div className="min-h-screen bg-[#f8f9fa] text-[#121214] transition-colors duration-300 font-sans selection:bg-[#121214] selection:text-white relative overflow-x-hidden">
-
+      
       {/* Fine Dotted Grid Background */}
       <div className="fixed inset-0 pointer-events-none opacity-[0.4] z-0"
            style={{

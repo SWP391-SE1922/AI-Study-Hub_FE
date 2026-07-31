@@ -242,7 +242,7 @@ function UpgradeModal({ onClose }: { onClose: () => void }) {
                         else toast.success('Bạn đang dùng gói Free!');
                       }}
                       className={`w-full rounded-full py-2 mt-6 font-bold text-xs transition-all ${
-                        isCurrentPlan
+                        isCurrentPlan 
                           ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed shadow-none'
                           : isUnlimited
                             ? 'bg-gradient-to-r from-indigo-500 to-fuchsia-500 text-white hover:opacity-90'
@@ -253,7 +253,7 @@ function UpgradeModal({ onClose }: { onClose: () => void }) {
                                 : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
                       }`}
                     >
-                      {isCurrentPlan
+                      {isCurrentPlan 
                         ? 'Đang sử dụng'
                         : isFree
                           ? 'Đăng ký miễn phí'
@@ -434,8 +434,8 @@ export function MainLayout() {
       {/* FLOATING TOP NAVBAR */}
       <div className="sticky top-0 z-50 w-full flex justify-center p-4">
         <nav className={`w-full transition-all duration-500 flex items-center justify-between px-6 py-3 ${
-          scrolled
-            ? 'max-w-5xl bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border border-zinc-200/50 dark:border-white/5 rounded-full shadow-lg'
+          scrolled 
+            ? 'max-w-5xl bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border border-zinc-200/50 dark:border-white/5 rounded-full shadow-lg' 
             : 'max-w-7xl bg-white/30 dark:bg-zinc-950/20 backdrop-blur-md border border-zinc-200/20 dark:border-white/5 rounded-2xl'
         }`}>
           <div className="flex items-center gap-3">

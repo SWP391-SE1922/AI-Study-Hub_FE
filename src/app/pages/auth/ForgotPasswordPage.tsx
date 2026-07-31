@@ -41,7 +41,7 @@ export function ForgotPasswordPage() {
             <Sparkles className="w-6 h-6 text-white" />
           </div>
         </div>
-
+        
         <div className="text-center space-y-2">
           <h2 className="text-3xl font-extrabold text-[#121214] tracking-tight">Quên mật khẩu</h2>
           <p className="text-[10px] uppercase font-bold tracking-widest text-stone-400 font-mono">
@@ -67,9 +67,9 @@ export function ForgotPasswordPage() {
             </div>
 
             <div className="pt-2">
-              <button
-                type="submit"
-                className="w-full py-3.5 bg-[#121214] hover:bg-stone-800 text-white font-bold rounded-full shadow-lg transition-all text-xs uppercase tracking-wider disabled:opacity-70"
+              <button 
+                type="submit" 
+                className="w-full py-3.5 bg-[#121214] hover:bg-stone-800 text-white font-bold rounded-full shadow-lg transition-all text-xs uppercase tracking-wider disabled:opacity-70" 
                 disabled={loading}
               >
                 {loading ? 'Đang gửi...' : 'Gửi mã khôi phục'}

@@ -87,7 +87,7 @@ export function VerifyEmailPage() {
                 </Link>
               </Button>
             )}
-
+            
             {status === 'loading' && (
               <Button disabled className="w-full h-11 text-base">
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -95,7 +95,7 @@ export function VerifyEmailPage() {
               </Button>
             )}
           </div>
-
+          
           {(status === 'success' || status === 'error') && (
             <div className="flex justify-center mt-4">
               <Link to="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">

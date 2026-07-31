@@ -100,9 +100,9 @@ export function DashboardPage() {
       setDocuments(docsResult.documents || []);
       setCategories(categoryResult);
       setSubjects(subjectResult);
-      setDashboardStats({
-        totalCourses: dashboardData?.totalCourses || 0,
-        totalQuizzes: dashboardData?.totalQuizzes || 0
+      setDashboardStats({ 
+        totalCourses: dashboardData?.totalCourses || 0, 
+        totalQuizzes: dashboardData?.totalQuizzes || 0 
       });
 
       if (getToken()) {
@@ -216,7 +216,7 @@ export function DashboardPage() {
   ];
 
   return (
-    <motion.div
+    <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6 text-slate-900 dark:text-slate-100"
@@ -264,7 +264,7 @@ export function DashboardPage() {
       </div>
 
       {/* Bố cục chính: Biểu đồ xu hướng bên trái & Thanh dung lượng lưu trữ bên phải */}
-      <motion.div
+      <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4 }}
@@ -319,7 +319,7 @@ export function DashboardPage() {
       </motion.div>
 
       {/* Bố cục bên dưới: Danh sách tài liệu bên trái & Biểu đồ cột phân phối bên phải */}
-      <motion.div
+      <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.6 }}

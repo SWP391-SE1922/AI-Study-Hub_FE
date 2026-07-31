@@ -186,7 +186,7 @@ export function ChatPage() {
           context += `- Thư mục "${folder.name}" hiện đang trống (0 tài liệu)\n`;
         }
       }
-
+      
       const rootDocs = rootRes.files || [];
       if (rootDocs.length > 0) {
         context += `- Các tài liệu ngoài thư mục gốc: ${rootDocs.map((d: any) => `"${d.title}"`).join(', ')}\n`;
@@ -387,3 +387,4 @@ export function ChatPage() {
     </div>
   );
 }
+

@@ -31,7 +31,7 @@ export function CustomCursor() {
       if (!target || typeof target.closest !== 'function') return;
 
       const isHoverable = target.closest('a, button, [role="button"], input[type="submit"], input[type="button"]');
-
+      
       if (isHoverable) {
         cursor.classList.add('custom-cursor-hover');
       } else {

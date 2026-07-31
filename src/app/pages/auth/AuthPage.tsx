@@ -81,7 +81,7 @@ export function AuthPage({ initialMode = 'login' }: AuthPageProps) {
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-[#f8f9fa] p-4 relative overflow-hidden font-sans selection:bg-[#121214] selection:text-white">
-
+      
       {/* Fine Dotted Grid Background */}
       <div className="absolute inset-0 pointer-events-none opacity-[0.4]"
            style={{
@@ -164,7 +164,7 @@ export function AuthPage({ initialMode = 'login' }: AuthPageProps) {
               >
                 {loginLoading ? 'Signing in...' : 'Sign In'}
               </button>
-
+              
               <div className="flex items-center w-full gap-2 text-stone-400">
                 <div className="h-px w-full bg-[#121214]/10"></div>
                 <span className="text-[10px] uppercase font-bold tracking-widest">OR</span>
@@ -181,7 +181,7 @@ export function AuthPage({ initialMode = 'login' }: AuthPageProps) {
                 Continue with Google
               </button>
             </div>
-
+            
             {/* Mobile Toggle */}
             <div className="md:hidden text-center pt-6">
               <p className="text-xs text-stone-500 font-medium">Don't have an account? <button type="button" onClick={() => setIsLogin(false)} className="font-bold text-[#121214] underline">Sign Up</button></p>
@@ -279,7 +279,7 @@ export function AuthPage({ initialMode = 'login' }: AuthPageProps) {
               >
                 {registerLoading ? 'Signing up...' : 'Sign Up'}
               </button>
-
+              
               <div className="flex items-center w-full gap-2 text-stone-400">
                 <div className="h-px w-full bg-[#121214]/10"></div>
                 <span className="text-[10px] uppercase font-bold tracking-widest">OR</span>
@@ -296,7 +296,7 @@ export function AuthPage({ initialMode = 'login' }: AuthPageProps) {
                 Continue with Google
               </button>
             </div>
-
+            
             {/* Mobile Toggle */}
             <div className="md:hidden text-center pt-4">
               <p className="text-xs text-stone-500 font-medium">Already have an account? <button type="button" onClick={() => setIsLogin(true)} className="font-bold text-[#121214] underline">Sign In</button></p>
@@ -322,13 +322,13 @@ export function AuthPage({ initialMode = 'login' }: AuthPageProps) {
         <div className="absolute -top-24 -right-24 w-64 h-64 rounded-full bg-white/5 blur-2xl" />
         <div className="absolute -bottom-32 -left-24 w-80 h-80 rounded-full bg-white/5 blur-3xl" />
 
-        <motion.div
+        <motion.div 
           className="relative w-[200%] h-full flex"
           initial={false}
           animate={{ x: isLogin ? '-50%' : '0%' }}
           transition={{ duration: 0.6, ease: 'easeInOut' }}
         >
-
+          
           {/* Overlay Login Panel (Shown when Registering) */}
           <div
             className="w-1/2 h-full flex flex-col items-center justify-center p-12 text-center"

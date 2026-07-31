@@ -18,7 +18,7 @@ export default function AiChatWidget() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<'qa' | 'summary' | 'quiz'>('qa');
-
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

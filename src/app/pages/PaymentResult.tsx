@@ -82,7 +82,7 @@ export function PaymentResult({ status: propStatus }: PaymentResultProps) {
         .animate-ring-glow { animation: ring-glow 2s ease-in-out infinite; }
       `}</style>
 
-      <motion.div
+      <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5 }}
@@ -122,8 +122,8 @@ export function PaymentResult({ status: propStatus }: PaymentResultProps) {
               {isSuccess ? 'Thanh toán thành công!' : 'Thanh toán thất bại'}
             </h1>
             <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              {isSuccess
-                ? 'Chúc mừng! Tài khoản của bạn đã được nâng cấp dung lượng lưu trữ thành công. Bạn hiện có thể tải lên thêm nhiều tài liệu học tập.'
+              {isSuccess 
+                ? 'Chúc mừng! Tài khoản của bạn đã được nâng cấp dung lượng lưu trữ thành công. Bạn hiện có thể tải lên thêm nhiều tài liệu học tập.' 
                 : message || 'Giao dịch thanh toán đã bị hủy hoặc không thành công. Bạn vui lòng thử lại hoặc chọn hình thức thanh toán khác.'}
             </p>
           </div>
