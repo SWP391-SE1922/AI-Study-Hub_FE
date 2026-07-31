@@ -175,13 +175,57 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     : null;
 
   if (!response.ok) {
-    if (response.status === 401) {
+    const isAuthEndpoint =
+      endpoint.startsWith('/auth/login') ||
+      endpoint.startsWith('/auth/register') ||
+      endpoint.startsWith('/auth/verify-email') ||
+      endpoint.startsWith('/auth/forgot-password') ||
+      endpoint.startsWith('/auth/reset-password') ||
+      endpoint.startsWith('/auth/resend-verification') ||
+      endpoint.startsWith('/auth/google');
+
+    const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+    const isAuthPage =
+      currentPath === '/' ||
+      currentPath === '/login' ||
+      currentPath === '/register' ||
+      currentPath === '/verify-email' ||
+      currentPath === '/forgot-password' ||
+      currentPath === '/reset-password';
+
+    if (response.status === 401 && !isAuthEndpoint && !isAuthPage) {
       logoutLocal();
-      if (window.location.pathname !== '/') {
-        window.location.href = '/';
+      window.location.href = '/';
+    }
+
+    let errorMessage = payload?.message;
+
+    if (!errorMessage && payload?.errors) {
+      if (typeof payload.errors === 'string') {
+        errorMessage = payload.errors;
+      } else if (Array.isArray(payload.errors)) {
+        errorMessage = payload.errors
+          .map((e: any) => e?.message || e?.msg || (typeof e === 'string' ? e : JSON.stringify(e)))
+          .filter(Boolean)
+          .join('; ');
+      } else if (typeof payload.errors === 'object') {
+        errorMessage = Object.values(payload.errors)
+          .flatMap((val: any) => (Array.isArray(val) ? val : [val]))
+          .map((e: any) => (typeof e === 'object' && e?.message ? e.message : String(e)))
+          .filter(Boolean)
+          .join('; ');
       }
     }
-    throw new Error(payload?.message || `Lỗi API ${response.status}`);
+
+    if (!errorMessage && payload?.error) {
+      if (typeof payload.error === 'string') {
+        errorMessage = payload.error;
+      } else if (payload.error?.message) {
+        errorMessage = payload.error.message;
+      }
+    }
+
+    throw new Error(errorMessage || `Lỗi API (${response.status})`);
   }
 
   return payload as T;

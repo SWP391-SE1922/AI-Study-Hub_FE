@@ -26,14 +26,14 @@ export function AdminLayout() {
         { path: '/admin/plans', label: 'Quản lý Gói đăng ký', icon: Package },
       ],
     },
-    {
-      title: 'QUẢN LÝ NỘI DUNG',
-      items: [
-        { path: '/admin/subjects', label: 'Quản lý Môn học', icon: BookOpen },
-        { path: '/admin/category', label: 'Quản lý Danh mục', icon: Tag },
-        { path: '/admin/documents', label: 'Quản lý Tài liệu', icon: FileText },
-      ],
-    },
+    // {
+    //   title: 'QUẢN LÝ NỘI DUNG',
+    //   items: [
+    //     // { path: '/admin/subjects', label: 'Quản lý Môn học', icon: BookOpen },
+    //     // { path: '/admin/category', label: 'Quản lý Danh mục', icon: Tag },
+    //     // { path: '/admin/documents', label: 'Quản lý Tài liệu', icon: FileText },
+    //   ],
+    // },
   ];
 
   return (

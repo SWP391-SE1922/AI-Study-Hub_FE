@@ -79,15 +79,27 @@ export function VerifyEmailPage() {
             </div>
           )}
 
-          <div className="pt-2">
-            {(status === 'success' || status === 'error') && (
+          <div className="pt-2 space-y-3">
+            {status === 'error' && (errorMessage.includes('chưa được tạo') || errorMessage.includes('chưa tạo') || errorMessage.includes('không tồn tại')) && (
               <Button asChild className="w-full bg-gradient-to-r from-primary to-secondary hover:opacity-90 h-11 text-base">
+                <Link to="/register">
+                  Đăng ký tài khoản mới
+                </Link>
+              </Button>
+            )}
+
+            {(status === 'success' || status === 'error') && (
+              <Button 
+                asChild 
+                variant={status === 'error' && (errorMessage.includes('chưa được tạo') || errorMessage.includes('chưa tạo') || errorMessage.includes('không tồn tại')) ? 'outline' : 'default'}
+                className="w-full h-11 text-base"
+              >
                 <Link to="/login">
                   Quay lại đăng nhập
                 </Link>
               </Button>
             )}
-            
+
             {status === 'loading' && (
               <Button disabled className="w-full h-11 text-base">
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

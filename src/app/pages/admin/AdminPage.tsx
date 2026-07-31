@@ -289,7 +289,7 @@ const pageMode = location.pathname.includes('/admin/users')
   const storageUsed = useMemo(() => users.reduce((sum, user) => sum + Number(user.usedStorage || 0), 0), [users]);
   const totalDownloads = useMemo(() => documents.reduce((sum, doc) => sum + Number(doc.downloadCount || 0), 0), [documents]);
   const verifiedUsers = useMemo(() => users.filter((user) => user.isVerified).length, [users]);
-
+  
 
   const stats = [
     { title: 'Tổng người dùng', value: String(users.length), change: `${verifiedUsers} đã xác thực`, icon: Users, color: 'text-sky-500', iconBg: 'bg-sky-50 dark:bg-sky-500/10' },
@@ -562,7 +562,7 @@ const pageMode = location.pathname.includes('/admin/users')
       };
     }
 
-
+   
 
     return {
       icon: Shield,
@@ -901,7 +901,7 @@ const pageMode = location.pathname.includes('/admin/users')
                       <TableHead className="py-4 px-4">Xác thực</TableHead>
                       <TableHead className="py-4 px-4">Dung lượng</TableHead>
                       <TableHead className="py-4 px-4">Ngày tạo</TableHead>
-                      <TableHead className="py-4 px-6 text-right">Thao tác</TableHead>
+                      {/* <TableHead className="py-4 px-6 text-right">Thao tác</TableHead> */}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -976,7 +976,7 @@ const pageMode = location.pathname.includes('/admin/users')
                           ) : (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button
+                                {/* <Button
                                   variant="outline"
                                   size="sm"
                                   className="gap-2"
@@ -984,7 +984,7 @@ const pageMode = location.pathname.includes('/admin/users')
                                 >
                                   <MoreVertical className="w-4 h-4" />
                                   Thao tác
-                                </Button>
+                                </Button> */}
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-52">
                                 <DropdownMenuItem disabled={user.id === currentUser?.id} onSelect={() => handleLockUser(user, '3d')}>
@@ -1137,7 +1137,7 @@ const pageMode = location.pathname.includes('/admin/users')
                   <span className="text-xs text-muted-foreground whitespace-nowrap">100 MB</span>
                 </div>
               </div>
-
+              
         {(docSearch || docTypeFilter || fromDate || toDate || docMaxSize < 100) && (
                 <div className="flex items-center justify-between mt-3">
                   <p className="text-xs text-muted-foreground">
@@ -1178,7 +1178,7 @@ const pageMode = location.pathname.includes('/admin/users')
                     <TableHead className="py-4 px-4">Lượt tải</TableHead>
                     <TableHead className="py-4 px-4">Trạng thái</TableHead>
                     <TableHead className="py-4 px-4">Ngày tải</TableHead>
-                    <TableHead className="py-4 px-6 text-center">Thao tác</TableHead>
+                    {/* <TableHead className="py-4 px-6 text-center">Thao tác</TableHead> */}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1283,7 +1283,7 @@ const pageMode = location.pathname.includes('/admin/users')
         </div>
       )}
 
-
+    
 
       <Dialog open={Boolean(versionDocument)} onOpenChange={(open) => {
         if (!open) {

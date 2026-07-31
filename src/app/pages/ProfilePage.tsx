@@ -303,7 +303,7 @@ export function ProfilePage() {
                       name="phoneNumber"
                       value={formData.phoneNumber}
                       onChange={handleChange}
-                      placeholder="0912345678"
+                      placeholder={user?.phoneNumber || ''}
                       className="h-11 bg-white/50 border-white focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 rounded-xl text-sm text-slate-900 shadow-sm transition-all"
                     />
                   </div>
