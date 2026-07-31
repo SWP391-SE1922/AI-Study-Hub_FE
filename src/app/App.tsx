@@ -5,27 +5,33 @@ import { Toaster } from './components/ui/sonner';
 
 // Pages
 import { LandingPage } from './pages/LandingPage';
-import { LoginPage } from './pages/auth/LoginPage';
-import { RegisterPage } from './pages/auth/RegisterPage';
+import { AuthPage } from './pages/auth/AuthPage';
 import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
+import { VerifyEmailPage } from './pages/auth/VerifyEmailPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { DocumentsPage } from './pages/documents/DocumentsPage';
 import { DocumentDetailPage } from './pages/documents/DocumentDetailPage';
 import { PublicDocumentsPage } from './pages/documents/PublicDocumentsPage'; // <-- Import trang mới ở đây
 import { ProfilePage } from './pages/ProfilePage';
 import { ChatPage } from './pages/ChatPage';
+import { TransactionHistoryPage } from './pages/TransactionHistoryPage';
 import { PaymentResult } from './pages/PaymentResult';
+import { PaymentStatusPage } from './pages/PaymentStatusPage';
 import { AdminPage } from './pages/admin/AdminPage';
 import { CategoryPage } from './pages/admin/adminCategory';
 import { SubjectPage } from './pages/admin/SubjectPage';
 import { AdminDocumentDetailPage } from './pages/admin/AdminDocumentDetailPage';
 import { AdminFinancePage } from './pages/admin/AdminFinancePage';
+import { AdminPlansPage } from './pages/admin/AdminPlansPage';
 
 // Layouts
 import { MainLayout } from './components/layout/MainLayout';
 import { AuthLayout } from './components/layout/AuthLayout';
 import { AdminLayout } from './components/layout/AdminLayout';
+import { CustomCursor } from './components/CustomCursor';
+import { CommandPalette } from './components/CommandPalette';
+import AiChatWidget from './components/ai/AiChatWidget';
 
 function readStoredRole() {
   try {
@@ -37,7 +43,7 @@ function readStoredRole() {
 }
 
 function getDefaultHomePath() {
-  return readStoredRole() === 'ADMIN' ? '/admin' : '/dashboard';
+  return readStoredRole() === 'ADMIN' ? '/admin' : '/documents';
 }
 
 function ProtectedWrapper({ isAuthenticated }: { isAuthenticated: boolean }) {
@@ -54,7 +60,7 @@ function AdminOnlyWrapper({ isAuthenticated }: { isAuthenticated: boolean }) {
   }
 
   if (readStoredRole() !== 'ADMIN') {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/documents" replace />;
   }
 
   return <Outlet />;
@@ -67,6 +73,7 @@ export default function App() {
   const [homePath, setHomePath] = useState<string>(() => getDefaultHomePath());
 
   useEffect(() => {
+    // Auth update listener
     const updateAuth = () => {
       setIsAuthenticated(Boolean(localStorage.getItem('authToken')) || localStorage.getItem('isAuthenticated') === 'true');
       setHomePath(getDefaultHomePath());
@@ -82,29 +89,38 @@ export default function App() {
   }, []);
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+      <CustomCursor />
       <BrowserRouter>
+        <CommandPalette />
         <Routes>
-          <Route path="/" element={isAuthenticated ? <Navigate to={homePath} replace /> : <LandingPage />} />
+          <Route path="/" element={<LandingPage />} />
+
+          {/* Payment result pages — public (không yêu cầu đăng nhập lại) */}
+          <Route path="/payment-status/success" element={<PaymentStatusPage status="success" />} />
+          <Route path="/payment-status/failed" element={<PaymentStatusPage status="failed" />} />
+          <Route path="/payment-status/error" element={<PaymentStatusPage status="error" />} />
+          <Route path="/payment-status/invalid" element={<PaymentStatusPage status="invalid" />} />
+          <Route path="/payment-result" element={<PaymentResult />} />
+
+          {/* New sliding AuthPage - No Layout needed */}
+          <Route path="/login" element={isAuthenticated ? <Navigate to={homePath} replace /> : <AuthPage initialMode="login" />} />
+          <Route path="/register" element={isAuthenticated ? <Navigate to={homePath} replace /> : <AuthPage initialMode="register" />} />
 
           <Route element={<AuthLayout />}>
-            <Route path="/login" element={isAuthenticated ? <Navigate to={homePath} replace /> : <LoginPage />} />
-            <Route path="/register" element={isAuthenticated ? <Navigate to={homePath} replace /> : <RegisterPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
           </Route>
 
           <Route element={<ProtectedWrapper isAuthenticated={isAuthenticated} />}>
             <Route element={<MainLayout />}>
-              <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/documents" element={<DocumentsPage />} />
               <Route path="/documents/:id" element={<DocumentDetailPage />} />
-              <Route path="/public-documents" element={<PublicDocumentsPage />} /> {/* <-- Thêm Route xem tài liệu công cộng */}
               <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/transactions" element={<TransactionHistoryPage />} />
               <Route path="/chat" element={<ChatPage />} />
-              <Route path="/payment-status/success" element={<PaymentResult status="success" />} />
-              <Route path="/payment-status/failed" element={<PaymentResult status="failed" />} />
-              <Route path="/payment-result" element={<PaymentResult />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
             </Route>
           </Route>
 
@@ -115,6 +131,7 @@ export default function App() {
               <Route path="/admin/documents" element={<AdminPage />} />
               <Route path="/admin/documents/:id" element={<AdminDocumentDetailPage />} />
               <Route path="/admin/finance" element={<AdminFinancePage />} />
+              <Route path="/admin/plans" element={<AdminPlansPage />} />
               <Route path="/admin/category" element={<CategoryPage />} />
               <Route path="/admin/subjects" element={<SubjectPage />} />
             </Route>
@@ -124,6 +141,7 @@ export default function App() {
         </Routes>
 
         <Toaster />
+        {isAuthenticated && <AiChatWidget />}
       </BrowserRouter>
     </ThemeProvider>
   );

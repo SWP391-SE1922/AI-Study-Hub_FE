@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Tag, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Edit, Trash2, Tag, Calendar, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Card, CardContent } from '../../components/ui/card';
@@ -14,21 +14,17 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
-import { apiRequest } from '../../services/api';
+import { Badge } from '../../components/ui/badge';
+import { apiRequest, restoreCategory } from '../../services/api';
 import { toast } from 'sonner';
 
-const glowCard =
-  'border-sky-500/10 dark:border-sky-400/10 bg-white dark:bg-slate-900 ' +
-  'shadow-[0_0_0_1px_rgba(56,189,248,0.06),0_8px_30px_-8px_rgba(56,189,248,0.35)] ' +
-  'dark:shadow-[0_0_0_1px_rgba(56,189,248,0.08),0_8px_35px_-6px_rgba(56,189,248,0.25)] ' +
-  'hover:shadow-[0_0_0_1px_rgba(56,189,248,0.12),0_12px_45px_-8px_rgba(56,189,248,0.55)] ' +
-  'dark:hover:shadow-[0_0_0_1px_rgba(56,189,248,0.18),0_12px_45px_-8px_rgba(56,189,248,0.45)] ' +
-  'transition-shadow duration-300';
+const glowCard = 'bg-white rounded-3xl p-2 border border-[#121214]/5 shadow-sm transition-all duration-300 hover:shadow-md';
 
 interface Category {
   id: string;
   name: string;
   description: string | null;
+  deletedAt?: string | null;
   createdAt: string;
 }
 
@@ -118,16 +114,26 @@ export function CategoryPage() {
   };
 
   const handleDelete = async (catId: string) => {
-    if (confirm('Bạn có chắc muốn xóa danh mục này? Các tài liệu thuộc danh mục sẽ chuyển thành không có danh mục.')) {
+    if (confirm('Xóa mềm danh mục này? Admin vẫn xem được và có thể khôi phục.')) {
       try {
         await apiRequest(`/categories/${catId}`, {
           method: 'DELETE',
         });
-        toast.success('Đã xóa danh mục thành công!');
-        setCategories((prev) => prev.filter((c) => c.id !== catId));
+        toast.success('Đã xóa mềm danh mục');
+        fetchCategories();
       } catch (err: any) {
         toast.error(err.message || 'Lỗi khi xóa danh mục.');
       }
+    }
+  };
+
+  const handleRestore = async (catId: string) => {
+    try {
+      await restoreCategory(catId);
+      toast.success('Đã khôi phục danh mục');
+      fetchCategories();
+    } catch (err: any) {
+      toast.error(err.message || 'Lỗi khi khôi phục danh mục.');
     }
   };
 
@@ -137,10 +143,10 @@ export function CategoryPage() {
   const totalPages = Math.max(1, Math.ceil(filteredCategories.length / PAGE_SIZE));
   const paginatedCategories = filteredCategories.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   return (
-    <div className="space-y-8 text-slate-900 dark:text-slate-100">
+    <div className="space-y-8 text-[#121214] selection:bg-[#121214] selection:text-white">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-gradient-to-br from-violet-500 via-indigo-500 to-fuchsia-500 rounded-xl flex items-center justify-center shadow-lg shadow-fuchsia-500/30">
+          <div className="w-12 h-12 bg-[#121214] rounded-xl flex items-center justify-center shadow-sm">
             <Tag className="w-6 h-6 text-white" />
           </div>
           <div>
@@ -148,7 +154,7 @@ export function CategoryPage() {
             <p className="text-muted-foreground mt-1">Danh sách các danh mục (Kinh tế, Lập trình v.v.).</p>
           </div>
         </div>
-        <Button onClick={openAddDialog} size="sm" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl">
+        <Button onClick={openAddDialog} size="sm" className="gap-2 bg-[#121214] hover:bg-stone-800 text-white rounded-xl">
           <Plus className="w-4 h-4" />
           Thêm danh mục
         </Button>
@@ -178,6 +184,7 @@ export function CategoryPage() {
                 <TableRow>
                   <TableHead className="py-4 px-6">Tên danh mục</TableHead>
                   <TableHead className="py-4 px-4">Mô tả</TableHead>
+                  <TableHead className="py-4 px-4">Trạng thái</TableHead>
                   <TableHead className="py-4 px-4">Ngày tạo</TableHead>
                   <TableHead className="py-4 px-6 text-right">Thao tác</TableHead>
                 </TableRow>
@@ -185,24 +192,31 @@ export function CategoryPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
                       Đang tải danh sách danh mục...
                     </TableCell>
                   </TableRow>
                 ) : filteredCategories.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
                       Không tìm thấy danh mục nào.
                     </TableCell>
                   </TableRow>
                 ) : (
                   paginatedCategories.map((cat) => (
-                    <TableRow key={cat.id} className="hover:bg-muted/10 border-b border-border last:border-0 transition-colors">
-                      <TableCell className="py-4 px-6 font-semibold text-slate-900 dark:text-slate-100 text-sm">
+                    <TableRow key={cat.id} className={`hover:bg-muted/10 border-b border-border last:border-0 transition-colors ${cat.deletedAt ? 'opacity-60' : ''}`}>
+                      <TableCell className="py-4 px-6 font-semibold text-[#121214] text-sm">
                         {cat.name}
                       </TableCell>
                       <TableCell className="py-4 px-4 text-muted-foreground text-sm max-w-sm truncate">
                         {cat.description || 'Chưa có mô tả'}
+                      </TableCell>
+                      <TableCell className="py-4 px-4">
+                        {cat.deletedAt ? (
+                          <Badge variant="destructive">Đã xóa</Badge>
+                        ) : (
+                          <Badge variant="secondary">Đang dùng</Badge>
+                        )}
                       </TableCell>
                       <TableCell className="py-4 px-4 text-muted-foreground text-xs">
                         <div className="flex items-center gap-1.5">
@@ -212,22 +226,36 @@ export function CategoryPage() {
                       </TableCell>
                       <TableCell className="py-4 px-6 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openEditDialog(cat)}
-                            className="h-8 w-8 rounded-full p-0 text-amber-600 hover:text-amber-700"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(cat.id)}
-                            className="h-8 w-8 rounded-full p-0 text-destructive hover:text-destructive/80"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          {cat.deletedAt ? (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleRestore(cat.id)}
+                              className="h-8 w-8 rounded-full p-0 text-emerald-600 hover:text-emerald-700"
+                              title="Khôi phục"
+                            >
+                              <RotateCcw className="w-4 h-4" />
+                            </Button>
+                          ) : (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => openEditDialog(cat)}
+                                className="h-8 w-8 rounded-full p-0 text-amber-600 hover:text-amber-700"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDelete(cat.id)}
+                                className="h-8 w-8 rounded-full p-0 text-destructive hover:text-destructive/80"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

@@ -33,7 +33,7 @@ export function DocumentMetadataDialog({
     description: '',
     subject: '',
     categoryId: '',
-    isPublic: true,
+    isPublic: false,
   });
   const [replacementFile, setReplacementFile] = useState<File | null>(null);
 
@@ -44,7 +44,7 @@ export function DocumentMetadataDialog({
       description: initialValues?.description || '',
       subject: initialValues?.subject || '',
       categoryId: initialValues?.categoryId || '',
-      isPublic: initialValues?.isPublic ?? true,
+      isPublic: initialValues?.isPublic ?? false,
     });
     setReplacementFile(null);
   }, [open, fileName, initialValues?.title, initialValues?.description, initialValues?.subject, initialValues?.categoryId, initialValues?.isPublic]);
@@ -98,27 +98,11 @@ export function DocumentMetadataDialog({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Phân loại tài liệu</label>
-            <select
-              value={form.categoryId || ''}
-              onChange={(e) => setForm((prev) => ({ ...prev, categoryId: e.target.value }))}
-              className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">Chưa phân loại</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>{category.name}</option>
-              ))}
-            </select>
-            {categories.length === 0 && (
-              <p className="text-xs text-amber-600">Chưa có danh mục trong database. Admin có thể thêm ở API /api/categories.</p>
-            )}
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Môn học / chủ đề</label>
+            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Môn học / chủ đề *</label>
             <input
               value={form.subject || ''}
               onChange={(e) => setForm((prev) => ({ ...prev, subject: e.target.value }))}
+              required
               className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-indigo-500"
               placeholder="VD: Software Testing, Cấu trúc dữ liệu..."
             />
@@ -151,16 +135,6 @@ export function DocumentMetadataDialog({
               )}
             </div>
           )}
-
-          <label className="flex items-center gap-2 text-sm text-muted-foreground select-none">
-            <input
-              type="checkbox"
-              checked={form.isPublic ?? true}
-              onChange={(e) => setForm((prev) => ({ ...prev, isPublic: e.target.checked }))}
-              className="accent-indigo-600"
-            />
-            Công khai tài liệu cho người khác xem
-          </label>
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose} disabled={submitting} className="rounded-xl">

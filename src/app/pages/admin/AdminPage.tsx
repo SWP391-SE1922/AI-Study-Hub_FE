@@ -13,7 +13,9 @@ import {
   Shield,
   TrendingUp,
   Users,
+  MoreVertical,
   Trash2,
+  RotateCcw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
@@ -22,12 +24,18 @@ import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Avatar, AvatarFallback } from '../../components/ui/avatar';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../components/ui/dropdown-menu';
 import {
-  deleteUser,
   getDocuments,
   getDocumentVersions,
   getMe,
   getUsers,
+  lockUser,
+  adminUpdateUserPlan,
+  deleteUser,
+  restoreUser,
+  deleteDocument,
+  restoreDocument,
   type DocumentItem,
   type DocumentVersionItem,
   type User,
@@ -75,14 +83,8 @@ function normalizeSearchText(value: string) {
     .trim();
 }
 
-// Glow shadow dùng chung cho các card — ánh sáng xanh dương (sky/cyan), đồng bộ với Dashboard người dùng.
-const glowCard =
-  'border-sky-500/10 dark:border-sky-400/10 bg-white dark:bg-slate-900 ' +
-  'shadow-[0_0_0_1px_rgba(56,189,248,0.06),0_8px_30px_-8px_rgba(56,189,248,0.35)] ' +
-  'dark:shadow-[0_0_0_1px_rgba(56,189,248,0.08),0_8px_35px_-6px_rgba(56,189,248,0.25)] ' +
-  'hover:shadow-[0_0_0_1px_rgba(56,189,248,0.12),0_12px_45px_-8px_rgba(56,189,248,0.55)] ' +
-  'dark:hover:shadow-[0_0_0_1px_rgba(56,189,248,0.18),0_12px_45px_-8px_rgba(56,189,248,0.45)] ' +
-  'transition-shadow duration-300';
+// Clean flat card style for monochromatic minimal theme
+const glowCard = 'bg-white rounded-3xl p-2 border border-[#121214]/5 shadow-sm transition-all duration-300 hover:shadow-md';
 
 type LineChartPoint = {
   key: string;
@@ -447,23 +449,81 @@ const pageMode = location.pathname.includes('/admin/users')
     return Array.from(types).sort((a, b) => a.localeCompare(b, 'vi'));
   }, [documents]);
 
-  const handleDeleteUser = async (user: User) => {
+  const handleLockUser = async (user: User, duration: '3d' | '7d' | 'permanent') => {
     if (!user.id) return;
     if (user.id === currentUser?.id) {
-      toast.error('Không thể xóa chính tài khoản admin đang đăng nhập.');
+      toast.error('Không thể khóa chính tài khoản admin đang đăng nhập.');
       return;
     }
 
-    const confirmed = window.confirm(`Bạn có chắc muốn xóa tài khoản "${user.fullName || user.email || user.id}"?`);
-    if (!confirmed) return;
+    setActionLoading(user.id);
+    try {
+      await lockUser(user.id, duration);
+      toast.success('Đã khóa tài khoản');
+      await loadAdminData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Không thể khóa tài khoản');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeleteUser = async (user: User) => {
+    if (!user.id) return;
+    if (user.id === currentUser?.id) {
+      toast.error('Không thể xóa chính tài khoản đang đăng nhập.');
+      return;
+    }
+    if (!confirm(`Xóa mềm tài khoản ${user.email || user.fullName}? Có thể khôi phục sau.`)) return;
 
     setActionLoading(user.id);
     try {
       await deleteUser(user.id);
-      toast.success('Đã xóa tài khoản');
+      toast.success('Đã xóa mềm người dùng');
       await loadAdminData();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Không thể xóa tài khoản');
+      toast.error(error instanceof Error ? error.message : 'Không thể xóa người dùng');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRestoreUser = async (user: User) => {
+    if (!user.id) return;
+    setActionLoading(user.id);
+    try {
+      await restoreUser(user.id);
+      toast.success('Đã khôi phục người dùng');
+      await loadAdminData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Không thể khôi phục người dùng');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeleteDocument = async (doc: DocumentItem) => {
+    if (!confirm(`Xóa mềm tài liệu "${doc.title}"? Có thể khôi phục sau.`)) return;
+    setActionLoading(doc.id);
+    try {
+      await deleteDocument(doc.id);
+      toast.success('Đã xóa mềm tài liệu');
+      await loadAdminData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Không thể xóa tài liệu');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRestoreDocument = async (doc: DocumentItem) => {
+    setActionLoading(doc.id);
+    try {
+      await restoreDocument(doc.id);
+      toast.success('Đã khôi phục tài liệu');
+      await loadAdminData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Không thể khôi phục tài liệu');
     } finally {
       setActionLoading(null);
     }
@@ -515,10 +575,10 @@ const pageMode = location.pathname.includes('/admin/users')
   const PageIcon = pageTitle.icon;
 
   return (
-    <div className="space-y-6 text-slate-900 dark:text-slate-100">
+    <div className="space-y-6 text-[#121214] selection:bg-[#121214] selection:text-white">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-gradient-to-br from-violet-500 via-indigo-500 to-fuchsia-500 rounded-xl flex items-center justify-center shadow-lg shadow-fuchsia-500/30">
+          <div className="w-12 h-12 bg-[#121214] rounded-xl flex items-center justify-center shadow-sm">
             <PageIcon className="w-6 h-6 text-white" />
           </div>
           <div>
@@ -616,7 +676,7 @@ const pageMode = location.pathname.includes('/admin/users')
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {paginatedRecentDocuments.map((doc) => (
-                    <div key={doc.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/20 p-3 hover:shadow-[0_0_20px_-10px_rgba(56,189,248,0.6)] transition-shadow">
+                    <div key={doc.id} className="flex items-center justify-between gap-3 rounded-xl border border-[#121214]/5 bg-[#f8f9fa] p-3 hover:shadow-md transition-shadow">
                       <div className="min-w-0">
                         <p className="font-medium truncate">{doc.title}</p>
                         <p className="text-xs text-muted-foreground">
@@ -679,7 +739,7 @@ const pageMode = location.pathname.includes('/admin/users')
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {paginatedTopDocuments.map((doc, index) => (
-                    <div key={doc.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/20 p-3 hover:shadow-[0_0_20px_-10px_rgba(56,189,248,0.6)] transition-shadow">
+                    <div key={doc.id} className="flex items-center justify-between gap-3 rounded-xl border border-[#121214]/5 bg-[#f8f9fa] p-3 hover:shadow-md transition-shadow">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="w-8 h-8 rounded-lg bg-sky-50 dark:bg-sky-500/10 text-sky-500 flex items-center justify-center text-sm font-bold">
                           {(topPage - 1) * TOP_DOCS_PAGE_SIZE + index + 1}
@@ -837,47 +897,115 @@ const pageMode = location.pathname.includes('/admin/users')
                       <TableHead className="py-4 px-6">Người dùng</TableHead>
                       <TableHead className="py-4 px-4">Email</TableHead>
                       <TableHead className="py-4 px-4">Vai trò</TableHead>
+                      <TableHead className="py-4 px-4">Gói cước</TableHead>
                       <TableHead className="py-4 px-4">Xác thực</TableHead>
                       <TableHead className="py-4 px-4">Dung lượng</TableHead>
                       <TableHead className="py-4 px-4">Ngày tạo</TableHead>
-                      <TableHead className="py-4 px-6 text-right">Thao tác</TableHead>
+                      {/* <TableHead className="py-4 px-6 text-right">Thao tác</TableHead> */}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {paginatedUsers.map((user) => (
-                      <TableRow key={user.id} className="hover:bg-muted/10 border-b border-border last:border-0 transition-colors">
+                      <TableRow key={user.id} className={`hover:bg-muted/10 border-b border-border last:border-0 transition-colors ${user.deletedAt ? 'opacity-60' : ''}`}>
                         <TableCell className="py-4 px-6">
                           <div className="flex items-center gap-3">
-                            <Avatar className="w-8 h-8 ring-2 ring-indigo-500/20">
-                              <AvatarFallback className="bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white text-xs">
+                            <Avatar className="w-8 h-8 ring-2 ring-[#121214]/10">
+                              <AvatarFallback className="bg-[#121214] text-white text-xs">
                                 {getInitials(user.fullName, user.email)}
                               </AvatarFallback>
                             </Avatar>
-                            <span className="font-medium whitespace-nowrap">{user.fullName || 'Chưa có tên'}</span>
+                            <div className="flex flex-col gap-1">
+                              <span className="font-medium whitespace-nowrap">{user.fullName || 'Chưa có tên'}</span>
+                              {user.deletedAt && <Badge variant="destructive" className="w-fit text-[10px]">Đã xóa</Badge>}
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell className="py-4 px-4 text-muted-foreground">{user.email}</TableCell>
                         <TableCell className="py-4 px-4 space-y-2">
-                          <Badge>{user.role || 'USER'}</Badge>
+                          <Badge className="bg-[#121214] text-white hover:bg-stone-800 border-none">{user.role || 'USER'}</Badge>
+                          {(user.isLocked || user.lockedUntil) && !user.deletedAt && (
+                            <Badge variant="destructive" className="uppercase">
+                              {user.lockedUntil ? `Đã khóa đến ${formatDate(user.lockedUntil)}` : 'Khóa vĩnh viễn'}
+                            </Badge>
+                          )}
                         </TableCell>
                         <TableCell className="py-4 px-4">
-                          <Badge variant={user.isVerified ? 'default' : 'secondary'}>
+                          <select
+                            value={user.plan || 'BASIC'}
+                            onChange={async (e) => {
+                              const nextPlan = e.target.value;
+                              setActionLoading(user.id || null);
+                              try {
+                                await adminUpdateUserPlan(user.id, nextPlan);
+                                toast.success(`Đã cập nhật gói ${nextPlan} cho người dùng thành công!`);
+                                await loadAdminData();
+                              } catch (err) {
+                                toast.error(err instanceof Error ? err.message : 'Lỗi khi cập nhật gói.');
+                              } finally {
+                                setActionLoading(null);
+                              }
+                            }}
+                            disabled={actionLoading === user.id || Boolean(user.deletedAt)}
+                            className="bg-background border border-input rounded-xl px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-sky-400 dark:text-white text-slate-800"
+                          >
+                            <option value="BASIC">BASIC</option>
+                            <option value="PREMIUM">PREMIUM</option>
+                            <option value="VIP">VIP</option>
+                            <option value="UNLIMITED">UNLIMITED</option>
+                          </select>
+                        </TableCell>
+                        <TableCell className="py-4 px-4">
+                          <Badge className={user.isVerified ? 'bg-[#121214] text-white hover:bg-stone-800 border-none' : 'bg-white text-[#121214] border border-[#121214]/10 hover:bg-stone-50'}>
                             {user.isVerified ? 'Đã xác thực' : 'Chưa xác thực'}
                           </Badge>
                         </TableCell>
                         <TableCell className="py-4 px-4 text-muted-foreground">{formatFileSize(user.usedStorage)}</TableCell>
                         <TableCell className="py-4 px-4 text-muted-foreground">{formatDate(user.createdAt)}</TableCell>
                         <TableCell className="py-4 px-6 text-right">
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8 rounded-full p-0 text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700 dark:border-rose-500/30 dark:hover:bg-rose-500/10"
-                            disabled={actionLoading === user.id || user.id === currentUser?.id}
-                            onClick={() => { void handleDeleteUser(user); }}
-                            aria-label="Xóa tài khoản"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          {user.deletedAt ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-2 text-emerald-600"
+                              disabled={actionLoading === user.id}
+                              onClick={() => handleRestoreUser(user)}
+                            >
+                              <RotateCcw className="w-4 h-4" />
+                              Khôi phục
+                            </Button>
+                          ) : (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                {/* <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-2"
+                                  disabled={actionLoading === user.id || user.id === currentUser?.id}
+                                >
+                                  <MoreVertical className="w-4 h-4" />
+                                  Thao tác
+                                </Button> */}
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-52">
+                                <DropdownMenuItem disabled={user.id === currentUser?.id} onSelect={() => handleLockUser(user, '3d')}>
+                                  Khóa 3 ngày
+                                </DropdownMenuItem>
+                                <DropdownMenuItem disabled={user.id === currentUser?.id} onSelect={() => handleLockUser(user, '7d')}>
+                                  Khóa 7 ngày
+                                </DropdownMenuItem>
+                                <DropdownMenuItem disabled={user.id === currentUser?.id} onSelect={() => handleLockUser(user, 'permanent')}>
+                                  Khóa vĩnh viễn
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  disabled={user.id === currentUser?.id}
+                                  className="text-destructive focus:text-destructive"
+                                  onSelect={() => handleDeleteUser(user)}
+                                >
+                                  Xóa mềm
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1048,49 +1176,78 @@ const pageMode = location.pathname.includes('/admin/users')
                     <TableHead className="py-4 px-4">Người tải</TableHead>
                     <TableHead className="py-4 px-4">Dung lượng</TableHead>
                     <TableHead className="py-4 px-4">Lượt tải</TableHead>
+                    <TableHead className="py-4 px-4">Trạng thái</TableHead>
                     <TableHead className="py-4 px-4">Ngày tải</TableHead>
-                    <TableHead className="py-4 px-6 text-center">Thao tác</TableHead>
+                    {/* <TableHead className="py-4 px-6 text-center">Thao tác</TableHead> */}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {paginatedDocuments.map((doc) => (
-                    <TableRow key={doc.id} className="hover:bg-muted/10 border-b border-border last:border-0 transition-colors">
+                    <TableRow key={doc.id} className={`hover:bg-muted/10 border-b border-border last:border-0 transition-colors ${doc.deletedAt ? 'opacity-60' : ''}`}>
                       <TableCell className="py-4 px-6 font-medium max-w-[320px] truncate">{doc.title}</TableCell>
                       <TableCell className="py-4 px-4 text-muted-foreground">{doc.category?.name || doc.subjectRef?.name || doc.subject || 'Chưa phân loại'}</TableCell>
                       <TableCell className="py-4 px-4 text-muted-foreground">{doc.user?.fullName || doc.uploadedBy || 'Không rõ'}</TableCell>
                       <TableCell className="py-4 px-4 text-muted-foreground">{formatFileSize(doc.fileSize)}</TableCell>
                       <TableCell className="py-4 px-4 text-center text-muted-foreground">{doc.downloadCount || 0}</TableCell>
+                      <TableCell className="py-4 px-4">
+                        {doc.deletedAt ? (
+                          <Badge variant="destructive">Đã xóa</Badge>
+                        ) : (
+                          <Badge variant="secondary">Đang dùng</Badge>
+                        )}
+                      </TableCell>
                       <TableCell className="py-4 px-4 text-muted-foreground">{formatDate(doc.createdAt)}</TableCell>
-                      <TableCell className="py-4 px-6 text-center max-w-[144px] whitespace-nowrap">
+                      <TableCell className="py-4 px-6 text-center max-w-[180px] whitespace-nowrap">
                         <div className="inline-flex items-center justify-center gap-0.5">
-                          <div className="inline-flex items-center justify-center gap-0.5">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-full p-0 text-[#121214] hover:bg-[#f8f9fa]"
+                            onClick={() => navigate(`/admin/documents/${doc.id}`)}
+                            aria-label="Xem"
+                          >
+                            <FileText className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-full p-0 text-[#121214] hover:bg-[#f8f9fa]"
+                            disabled={versionLoading && versionDocument?.id === doc.id}
+                            onClick={() => handleViewDocumentVersions(doc)}
+                            aria-label="Version"
+                          >
+                            <History className="w-4 h-4" />
+                          </Button>
+                          {doc.deletedAt ? (
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 rounded-full p-0 text-sky-600 hover:text-sky-700"
-                              onClick={() => navigate(`/admin/documents/${doc.id}`)}
-                              aria-label="Xem"
+                              className="h-8 w-8 rounded-full p-0 text-emerald-600 hover:text-emerald-700"
+                              disabled={actionLoading === doc.id}
+                              onClick={() => handleRestoreDocument(doc)}
+                              aria-label="Khôi phục"
                             >
-                              <FileText className="w-4 h-4" />
+                              <RotateCcw className="w-4 h-4" />
                             </Button>
+                          ) : (
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 rounded-full p-0 text-purple-600 hover:text-purple-700"
-                              disabled={versionLoading && versionDocument?.id === doc.id}
-                              onClick={() => handleViewDocumentVersions(doc)}
-                              aria-label="Version"
+                              className="h-8 w-8 rounded-full p-0 text-destructive hover:text-destructive/80"
+                              disabled={actionLoading === doc.id}
+                              onClick={() => handleDeleteDocument(doc)}
+                              aria-label="Xóa mềm"
                             >
-                              <History className="w-4 h-4" />
+                              <Trash2 className="w-4 h-4" />
                             </Button>
-                          </div>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
                   ))}
                   {!filteredDocuments.length && (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                         {loading ? 'Đang tải tài liệu...' : 'Chưa có tài liệu.'}
                       </TableCell>
                     </TableRow>
@@ -1151,7 +1308,7 @@ const pageMode = location.pathname.includes('/admin/users')
                       <p className="font-bold text-foreground">Version {version.version}</p>
                       <p className="text-sm text-muted-foreground break-all">{version.fileName}</p>
                     </div>
-                    <span className="text-xs font-semibold text-indigo-500 bg-indigo-500/10 px-3 py-1 rounded-full self-start sm:self-auto">
+                    <span className="text-xs font-semibold text-[#121214] bg-white border border-[#121214]/10 px-3 py-1 rounded-full self-start sm:self-auto">
                       {formatFileSize(version.fileSize)}
                     </span>
                   </div>

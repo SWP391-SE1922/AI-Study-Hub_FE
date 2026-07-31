@@ -20,6 +20,7 @@ export type User = {
   id: string;
   email?: string;
   fullName?: string;
+  phoneNumber?: string | null;
   role?: string;
   avatarUrl?: string | null;
   isVerified?: boolean;
@@ -27,6 +28,10 @@ export type User = {
   lockedUntil?: string | null;
   usedStorage?: number;
   storageLimit?: number;
+  plan?: string;
+  aiQuestionsUsed?: number;
+  aiQuestionsLimit?: number;
+  deletedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -45,6 +50,7 @@ export type CategoryItem = {
   id: string;
   name: string;
   description?: string | null;
+  deletedAt?: string | null;
   createdAt?: string;
   _count?: { documents: number };
 };
@@ -54,6 +60,8 @@ export type SubjectItem = {
   name: string;
   code?: string | null;
   description?: string | null;
+  deletedAt?: string | null;
+  createdAt?: string;
 };
 
 export type DocumentVersionItem = {
@@ -89,6 +97,7 @@ export type DocumentItem = {
   subjectRef?: { id: string; name: string; code?: string | null } | null;
   user?: { id: string; fullName?: string; avatarUrl?: string | null } | null;
   versions?: DocumentVersionItem[];
+  deletedAt?: string | null;
 };
 
 export type DocumentMetadata = {
@@ -97,6 +106,7 @@ export type DocumentMetadata = {
   subject?: string;
   categoryId?: string;
   isPublic?: boolean;
+  folderId?: string | null;
 };
 
 export type ChatSession = {
@@ -115,54 +125,7 @@ export type ChatMessage = {
   content: string;
   createdAt: string;
 };
-export type SubscriptionPlan = {
-  id: string;
-  name: string;
-  code: string;
-  price: number;
-  storageLimit: number;
-  dailyChatLimit: number;
-  durationDays: number;
-  description?: string | null;
-  isActive: boolean;
-  createdAt?: string;
-  updatedAt?: string;
-};
 
-export type UserSubscription = {
-  id: string;
-  userId: string;
-  planId: string;
-  status: 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'SUSPENDED' | string;
-  startDate: string;
-  expireDate: string;
-  createdAt?: string;
-  updatedAt?: string;
-  plan: SubscriptionPlan;
-};
-
-export type CreateVnpayPaymentResult = {
-  success: boolean;
-  message: string;
-  paymentUrl: string;
-  transactionId: string;
-};
-export type BankTransferPaymentResult = {
-  transaction: {
-    id: string;
-    status: string;
-    amount: number;
-    paymentCode: string;
-  };
-  bank: {
-    bankId: string;
-    bankName: string;
-    accountNo: string;
-    accountName: string;
-  };
-  transferContent: string;
-  qrUrl: string;
-};
 export function getToken() {
   return localStorage.getItem('authToken');
 }
@@ -212,7 +175,57 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     : null;
 
   if (!response.ok) {
-    throw new Error(payload?.message || `Lỗi API ${response.status}`);
+    const isAuthEndpoint =
+      endpoint.startsWith('/auth/login') ||
+      endpoint.startsWith('/auth/register') ||
+      endpoint.startsWith('/auth/verify-email') ||
+      endpoint.startsWith('/auth/forgot-password') ||
+      endpoint.startsWith('/auth/reset-password') ||
+      endpoint.startsWith('/auth/resend-verification') ||
+      endpoint.startsWith('/auth/google');
+
+    const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+    const isAuthPage =
+      currentPath === '/' ||
+      currentPath === '/login' ||
+      currentPath === '/register' ||
+      currentPath === '/verify-email' ||
+      currentPath === '/forgot-password' ||
+      currentPath === '/reset-password';
+
+    if (response.status === 401 && !isAuthEndpoint && !isAuthPage) {
+      logoutLocal();
+      window.location.href = '/';
+    }
+
+    let errorMessage = payload?.message;
+
+    if (!errorMessage && payload?.errors) {
+      if (typeof payload.errors === 'string') {
+        errorMessage = payload.errors;
+      } else if (Array.isArray(payload.errors)) {
+        errorMessage = payload.errors
+          .map((e: any) => e?.message || e?.msg || (typeof e === 'string' ? e : JSON.stringify(e)))
+          .filter(Boolean)
+          .join('; ');
+      } else if (typeof payload.errors === 'object') {
+        errorMessage = Object.values(payload.errors)
+          .flatMap((val: any) => (Array.isArray(val) ? val : [val]))
+          .map((e: any) => (typeof e === 'object' && e?.message ? e.message : String(e)))
+          .filter(Boolean)
+          .join('; ');
+      }
+    }
+
+    if (!errorMessage && payload?.error) {
+      if (typeof payload.error === 'string') {
+        errorMessage = payload.error;
+      } else if (payload.error?.message) {
+        errorMessage = payload.error.message;
+      }
+    }
+
+    throw new Error(errorMessage || `Lỗi API (${response.status})`);
   }
 
   return payload as T;
@@ -233,10 +246,18 @@ export async function login(email: string, password: string) {
   return result.data;
 }
 
-export async function register(fullName: string, email: string, password: string) {
+export async function loginGoogle(idToken: string) {
+  const result = await request<ApiResponse<LoginResponse>>('/auth/google', {
+    method: 'POST',
+    body: JSON.stringify({ idToken }),
+  });
+  return result.data;
+}
+
+export async function register(fullName: string, email: string, password: string, phoneNumber: string) {
   const result = await request<ApiResponse<LoginResponse>>('/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ fullName, email, password }),
+    body: JSON.stringify({ fullName, email, password, phoneNumber }),
   });
   return result.data;
 }
@@ -260,12 +281,25 @@ export async function resetPassword(token: string, newPassword: string) {
   return result.message;
 }
 
+export async function verifyEmail(token: string) {
+  const result = await request<ApiResponse<null>>(`/auth/verify-email?token=${encodeURIComponent(token)}`);
+  return result.message;
+}
+
+export async function resendVerificationEmail(email: string) {
+  const result = await request<ApiResponse<{ emailSent: boolean | null }>>('/auth/resend-verification', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+  return result.message;
+}
+
 export async function getMe() {
   const result = await request<ApiResponse<{ user: User }>>('/auth/me');
   return result.data.user;
 }
 
-export async function updateProfile(data: Pick<User, 'fullName' | 'avatarUrl'>) {
+export async function updateProfile(data: Pick<User, 'fullName' | 'avatarUrl' | 'phoneNumber'>) {
   const result = await request<ApiResponse<{ user: User }>>('/auth/update-profile', {
     method: 'PUT',
     body: JSON.stringify(data),
@@ -273,6 +307,16 @@ export async function updateProfile(data: Pick<User, 'fullName' | 'avatarUrl'>) 
   localStorage.setItem('user', JSON.stringify(result.data.user));
   window.dispatchEvent(new Event('authChange'));
   return result.data.user;
+}
+
+export async function uploadAvatar(file: File) {
+  const formData = new FormData();
+  formData.append('avatar', file);
+  const result = await request<ApiResponse<{ avatarUrl: string }>>('/auth/upload-avatar', {
+    method: 'POST',
+    body: formData,
+  });
+  return result.data.avatarUrl;
 }
 
 export async function getCategories() {
@@ -289,11 +333,11 @@ export async function getSubjects() {
   return payload?.data?.subjects || [];
 }
 
-function buildQueryString(params: Record<string, string | number | undefined> = {}) {
+function buildQueryString(params: Record<string, string | number | undefined | null> = {}) {
   const searchParams = new URLSearchParams();
 
   Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== '') {
+    if (value !== undefined && value !== null && value !== '') {
       searchParams.set(key, String(value));
     }
   });
@@ -330,6 +374,9 @@ export async function uploadDocument(file: File, metadata: DocumentMetadata | st
   if (normalized.categoryId) {
     formData.append('categoryId', normalized.categoryId);
   }
+  if (normalized.folderId) {
+    formData.append('folderId', normalized.folderId);
+  }
 
   const result = await request<ApiResponse<{ document: DocumentItem }>>('/documents', {
     method: 'POST',
@@ -350,6 +397,9 @@ export async function updateDocument(id: string, metadata: Partial<DocumentMetad
 
     if (metadata.categoryId) {
       body.append('categoryId', metadata.categoryId);
+    }
+    if (metadata.folderId) {
+      body.append('folderId', metadata.folderId);
     }
   }
 
@@ -373,15 +423,17 @@ export async function getDocumentVersions(id: string) {
 }
 
 export async function deleteDocument(id: string) {
-  const response = await fetch(`${API_BASE_URL}/documents/${id}`, {
+  const result = await request<ApiResponse<null>>(`/documents/${id}`, {
     method: 'DELETE',
-    headers: buildHeaders(),
   });
+  return result;
+}
 
-  if (!response.ok && response.status !== 204) {
-    const payload = await response.json().catch(() => null);
-    throw new Error(payload?.message || `Lỗi API ${response.status}`);
-  }
+export async function restoreDocument(id: string) {
+  const result = await request<ApiResponse<{ document: DocumentItem }>>(`/documents/${id}/restore`, {
+    method: 'POST',
+  });
+  return result.data.document;
 }
 
 export function toAbsoluteFileUrl(fileUrl?: string | null) {
@@ -520,15 +572,17 @@ export async function lockUser(id: string, duration: '3d' | '7d' | 'permanent') 
 }
 
 export async function deleteUser(id: string) {
-  const response = await fetch(`${API_BASE_URL}/users/${id}`, {
+  const result = await request<ApiResponse<null>>(`/users/${id}`, {
     method: 'DELETE',
-    headers: buildHeaders(),
   });
+  return result;
+}
 
-  if (!response.ok && response.status !== 204) {
-    const payload = await response.json().catch(() => null);
-    throw new Error(payload?.message || `Lỗi API ${response.status}`);
-  }
+export async function restoreUser(id: string) {
+  const result = await request<ApiResponse<{ user: User }>>(`/users/${id}/restore`, {
+    method: 'POST',
+  });
+  return result.data.user;
 }
 
 export async function getChatSessions() {
@@ -587,108 +641,224 @@ export async function getPublicDocuments(params: Record<string, string | number 
   const result = await request<ApiResponse<DocumentItem[]>>(`/documents${query ? `?${query}` : ''}`);
   return { documents: result.data, pagination: result.pagination };
 }
-// ==================== SUBSCRIPTION ====================
-
-export async function getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
-  const result = await request<
-    ApiResponse<{ plans: SubscriptionPlan[] }> |
-    { success: boolean; message: string; data?: { plans?: SubscriptionPlan[] }; plans?: SubscriptionPlan[] }
-  >('/subscriptions/plans');
-
-  const payload = result as any;
-
-  if (Array.isArray(payload?.data?.plans)) {
-    return payload.data.plans;
-  }
-
-  if (Array.isArray(payload?.plans)) {
-    return payload.plans;
-  }
-
-  if (Array.isArray(payload?.data)) {
-    return payload.data;
-  }
-
-  return [];
-}
-
-export async function getCurrentSubscription(): Promise<UserSubscription | null> {
-  const result = await request<
-    ApiResponse<{ subscription: UserSubscription | null }> |
+export async function createVnpayPaymentUrl(amount: number, bankCode?: string) {
+  const data = await apiRequest<{ paymentUrl: string; invoice?: InvoiceItem | null }>(
+    '/vnpay/create_payment_url',
     {
-      success: boolean;
-      message: string;
-      data?: {
-        subscription?: UserSubscription | null;
-      };
-      subscription?: UserSubscription | null;
+      method: 'POST',
+      body: JSON.stringify({ amount, bankCode, language: 'vn' }),
     }
-  >('/subscriptions/current');
-
-  const payload = result as any;
-
-  return (
-    payload?.data?.subscription ??
-    payload?.subscription ??
-    null
   );
+  return data.paymentUrl;
 }
 
-// ==================== VNPAY ====================
+export async function createVnpayPaymentForPlan(planId: string, bankCode?: string) {
+  const data = await apiRequest<{ paymentUrl: string; invoice?: InvoiceItem | null }>(
+    '/vnpay/create_payment_url',
+    {
+      method: 'POST',
+      body: JSON.stringify({ planId, bankCode, language: 'vn' }),
+    }
+  );
+  return data;
+}
 
-export async function createBankTransferPayment(
-  planId: string
-): Promise<BankTransferPaymentResult> {
-  if (!planId) {
-    throw new Error('Vui lòng chọn gói nâng cấp');
-  }
-
-  const result = await request<
-    ApiResponse<BankTransferPaymentResult>
-  >('/bank-transfer/create', {
-    method: 'POST',
-    body: JSON.stringify({
-      planId,
-    }),
-  });
-
+export async function subscribeFreePlan(planId?: string, planCode?: string) {
+  const result = await request<ApiResponse<{ user: User; plan: SubscriptionPlan }>>(
+    '/vnpay/subscribe-free',
+    {
+      method: 'POST',
+      body: JSON.stringify({ planId, planCode }),
+    }
+  );
   return result.data;
 }
 
-export async function confirmBankTransfer(
-  transactionId: string
-) {
-  if (!transactionId) {
-    throw new Error('Thiếu mã giao dịch');
-  }
+export type SubscriptionPlan = {
+  id: string;
+  code: string;
+  name: string;
+  price: number;
+  currency?: string;
+  storageLimit: number;
+  aiQuestionsLimit: number;
+  aiModel: string;
+  durationDays: number;
+  features: string[];
+  description?: string | null;
+  isActive: boolean;
+  isDeleted?: boolean;
+  deletedAt?: string | null;
+  status?: 'active' | 'inactive' | 'deleted' | string;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
 
+export type InvoiceItem = {
+  id: string;
+  invoiceCode: string;
+  userId: string;
+  planId: string;
+  amount: number;
+  status: string;
+  paymentMethod?: string | null;
+  txnRef?: string | null;
+  description?: string | null;
+  paidAt?: string | null;
+  createdAt?: string;
+  plan?: SubscriptionPlan | null;
+  user?: { id: string; email?: string; fullName?: string } | null;
+};
+
+export async function getActivePlans() {
+  const result = await request<ApiResponse<{ plans: SubscriptionPlan[] }>>('/plans');
+  return result.data.plans;
+}
+
+export async function getAllPlansAdmin() {
+  const result = await request<ApiResponse<{ plans: SubscriptionPlan[] }>>('/plans/all');
+  return result.data.plans;
+}
+
+export async function createPlan(payload: Partial<SubscriptionPlan> & { code: string; name: string }) {
+  const result = await request<ApiResponse<{ plan: SubscriptionPlan }>>('/plans', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return result.data.plan;
+}
+
+export async function updatePlan(id: string, payload: Partial<SubscriptionPlan>) {
+  const result = await request<ApiResponse<{ plan: SubscriptionPlan }>>(`/plans/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+  return result.data.plan;
+}
+
+export async function deletePlan(id: string) {
+  const result = await request<ApiResponse<{ plan: SubscriptionPlan }>>(`/plans/${id}`, {
+    method: 'DELETE',
+  });
+  return result.data.plan;
+}
+
+export async function restorePlan(id: string) {
+  const result = await request<ApiResponse<{ plan: SubscriptionPlan }>>(`/plans/${id}/restore`, {
+    method: 'POST',
+  });
+  return result.data.plan;
+}
+
+export async function restoreCategory(id: string) {
+  const result = await request<ApiResponse<{ category: CategoryItem }>>(`/categories/${id}/restore`, {
+    method: 'POST',
+  });
+  return result.data.category;
+}
+
+export async function restoreSubject(id: string) {
+  const result = await request<ApiResponse<{ subject: SubjectItem }>>(`/subjects/${id}/restore`, {
+    method: 'POST',
+  });
+  return result.data.subject;
+}
+
+export async function getAllInvoicesAdmin(params: Record<string, string | undefined> = {}) {
+  const result = await request<ApiResponse<{ invoices: InvoiceItem[] }>>(
+    `/invoices${buildQueryString(params)}`
+  );
+  return result.data.invoices;
+}
+
+export async function getMyInvoices() {
+  const result = await request<ApiResponse<{ invoices: InvoiceItem[] }>>('/invoices/my');
+  return result.data.invoices;
+}
+
+// ----------------- NEW APIs -----------------
+
+export async function getDashboardData() {
+  const result = await request<ApiResponse<{ totalDocuments: number; totalCourses: number; totalQuizzes: number }>>('/dashboard');
+  return result.data;
+}
+
+export async function createFolder(name: string, parentId?: string | null) {
+  const result = await request<ApiResponse<{ folder: FolderItem }>>('/folders', {
+    method: 'POST',
+    body: JSON.stringify({ name, parentId }),
+  });
+  return result.data.folder;
+}
+
+export async function deleteFolder(id: string) {
+  await request<ApiResponse<null>>(`/folders/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function getResources(folderId?: string | null) {
+  const result = await request<ApiResponse<{ folders: FolderItem[], files: DocumentItem[] }>>(`/resources${buildQueryString({ folderId })}`);
+  return result.data || { folders: [], files: [] };
+}
+
+export async function getMyTransactions() {
+  const result = await request<ApiResponse<any>>('/transactions/my-transactions');
+  return result.data;
+}
+
+export async function getAllTransactions(params: Record<string, string | undefined> = {}) {
   const result = await request<
     ApiResponse<{
-      transaction: {
-        id: string;
-        status: string;
+      transactions: any[];
+      summary?: {
+        total: number;
+        success: number;
+        failed: number;
+        pending: number;
+        revenue: number;
       };
     }>
-  >(`/bank-transfer/${transactionId}/confirm`, {
-    method: 'PATCH',
-  });
-
-  return result.data.transaction;
-}
-export async function getAllTransactions() {
-  const result = await request<ApiResponse<{
-    transactions: any[];
-  }>>('/transactions/all');
-
-  return result.data.transactions;
+  >(`/transactions/all${buildQueryString(params)}`);
+  return result.data;
 }
 
-export async function approveTransaction(id: string) {
-  const result = await request<
-    ApiResponse<any>
-  >(`/transactions/${id}/approve`, {
-    method: 'PATCH',
-  });
 
+export async function getProfile() {
+  const result = await request<ApiResponse<User>>('/profile');
+  return result.data;
+}
+
+export async function upgradeUserPlan(plan: string) {
+  const result = await request<ApiResponse<User>>('/profile/upgrade', {
+    method: 'PUT',
+    body: JSON.stringify({ plan }),
+  });
+  return result.data;
+}
+
+export async function adminUpdateUserPlan(userId: string, plan: string) {
+  const result = await request<ApiResponse<{ user: User }>>(`/users/${userId}/plan`, {
+    method: 'PUT',
+    body: JSON.stringify({ plan }),
+  });
+  return result.data.user;
+}
+
+export type FolderItem = {
+  id: string;
+  name: string;
+  parentId?: string | null;
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export async function askAi(question: string, mode: 'qa' | 'summary' | 'quiz' = 'qa') {
+  const result = await request<ApiResponse<{ answer: string, sources: string[], modelUsed: string }>>('/ai/ask', {
+    method: 'POST',
+    body: JSON.stringify({ question, mode }),
+  });
   return result.data;
 }

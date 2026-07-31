@@ -1,1505 +1,1012 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ArrowLeftRight,
-  CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
+  LayoutDashboard,
   CreditCard,
+  Receipt,
+  Wallet,
+  ArrowLeftRight,
   Crown,
   Eye,
-  HardDrive,
-  LayoutDashboard,
-  Loader2,
-  Receipt,
-  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
   Search,
-  Wallet,
+  CalendarRange,
+  Filter,
+  RefreshCw,
+  TrendingUp,
+  Users,
+  X,
 } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
+import { Badge } from '../../components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
+import { Button } from '../../components/ui/button';
+import { Input } from '../../components/ui/input';
+import { Label } from '../../components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../../components/ui/sheet';
 import { toast } from 'sonner';
-
 import {
-  approveTransaction,
+  getAllInvoicesAdmin,
   getAllTransactions,
-  getSubscriptionPlans,
-  type SubscriptionPlan,
+  type InvoiceItem,
 } from '../../services/api';
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '../../components/ui/card';
-import { Badge } from '../../components/ui/badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../../components/ui/table';
-import { Button } from '../../components/ui/button';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '../../components/ui/tabs';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '../../components/ui/dialog';
+const glowCard = 'bg-white rounded-3xl p-2 border border-[#121214]/5 shadow-sm transition-all duration-300 hover:shadow-md';
 
-const glowCard =
-  'border-sky-500/10 dark:border-sky-400/10 bg-white dark:bg-slate-900 ' +
-  'shadow-[0_0_0_1px_rgba(56,189,248,0.06),0_8px_30px_-8px_rgba(56,189,248,0.35)] ' +
-  'dark:shadow-[0_0_0_1px_rgba(56,189,248,0.08),0_8px_35px_-6px_rgba(56,189,248,0.25)] ' +
-  'hover:shadow-[0_0_0_1px_rgba(56,189,248,0.12),0_12px_45px_-8px_rgba(56,189,248,0.55)] ' +
-  'dark:hover:shadow-[0_0_0_1px_rgba(56,189,248,0.18),0_12px_45px_-8px_rgba(56,189,248,0.45)] ' +
-  'transition-shadow duration-300';
+const PAGE_SIZE = 8;
 
-type TransactionStatus =
-  | 'PENDING'
-  | 'WAITING_CONFIRMATION'
-  | 'PROCESSING'
-  | 'SUCCESS'
-  | 'FAILED'
-  | 'CANCELLED'
-  | string;
+type DatePreset = 'all' | '7d' | '30d' | 'month' | 'custom';
 
-type TransactionUser = {
-  id: string;
-  email?: string;
-  fullName?: string;
-};
-
-type TransactionPlan = {
-  id: string;
-  name: string;
-  code?: string;
-  price?: number;
-  storageLimit?: number;
-  dailyChatLimit?: number;
-  durationDays?: number;
-};
-
-type TransactionItem = {
-  id: string;
-  amount: number | string;
-  status: TransactionStatus;
-  paymentMethod?: string;
-  description?: string | null;
-  orderInfo?: string | null;
-  transactionNo?: string | null;
-  bankCode?: string | null;
-  responseCode?: string | null;
-  paidAt?: string | null;
-  createdAt: string;
-  updatedAt?: string;
-  user?: TransactionUser | null;
-  plan?: TransactionPlan | null;
-};
-
-type InvoiceItem = {
+interface PaymentRow {
   id: string;
   code: string;
-  user: string;
+  invoiceCode: string;
+  userName: string;
+  userEmail: string;
   plan: string;
   method: string;
   amount: number;
   createdAt: string;
-  status: 'PAID';
-};
-
-type RevenuePoint = {
-  key: string;
-  label: string;
-  value: number;
-};
-
-const PAYMENT_PAGE_SIZE = 6;
-const PLAN_PAGE_SIZE = 6;
-const INVOICE_PAGE_SIZE = 6;
-
-function formatCurrency(value: number | string | null | undefined): string {
-  const amount = Number(value || 0);
-  return `${amount.toLocaleString('vi-VN')}đ`;
+  createdAtRaw: string;
+  status: 'success' | 'failed' | 'pending';
+  description?: string;
 }
 
-function formatDate(value?: string | null): string {
+interface InvoiceRow {
+  id: string;
+  code: string;
+  txnRef: string;
+  userName: string;
+  userEmail: string;
+  plan: string;
+  method: string;
+  amount: number;
+  createdAt: string;
+  createdAtRaw: string;
+  paidAt: string;
+  status: 'paid' | 'unpaid' | 'cancelled';
+}
+
+type LineChartPoint = { key: string; label: string; value: number };
+
+function formatCurrency(value: number): string {
+  return `${Number(value || 0).toLocaleString('vi-VN')}đ`;
+}
+
+function formatDateTime(value?: string | null) {
   if (!value) return '—';
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '—';
-
-  return new Intl.DateTimeFormat('vi-VN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  return d.toLocaleString('vi-VN');
 }
 
-function normalizeSearchText(value?: string | null): string {
-  return (value || '')
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .toLowerCase()
-    .trim();
+function toInputDate(d: Date) {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 }
 
-function bytesToGb(value?: number): string {
-  const bytes = Number(value || 0);
-  return `${Math.round((bytes / 1024 ** 3) * 100) / 100} GB`;
+function getPresetRange(preset: DatePreset): { fromDate: string; toDate: string } {
+  const today = new Date();
+  const toDate = toInputDate(today);
+  if (preset === '7d') {
+    const from = new Date();
+    from.setDate(from.getDate() - 6);
+    return { fromDate: toInputDate(from), toDate };
+  }
+  if (preset === '30d') {
+    const from = new Date();
+    from.setDate(from.getDate() - 29);
+    return { fromDate: toInputDate(from), toDate };
+  }
+  if (preset === 'month') {
+    const from = new Date(today.getFullYear(), today.getMonth(), 1);
+    return { fromDate: toInputDate(from), toDate };
+  }
+  return { fromDate: '', toDate: '' };
 }
 
-function getTransactionCode(transaction: TransactionItem): string {
-  return (
-    transaction.orderInfo ||
-    transaction.transactionNo ||
-    transaction.id.slice(0, 12).toUpperCase()
-  );
+function mapTxnToRow(txn: any): PaymentRow {
+  const statusMap: Record<string, PaymentRow['status']> = {
+    SUCCESS: 'success',
+    FAILED: 'failed',
+    PENDING: 'pending',
+  };
+  return {
+    id: txn.id,
+    code: txn.txnRef || txn.id.slice(0, 10).toUpperCase(),
+    invoiceCode: txn.invoice?.invoiceCode || '—',
+    userName: txn.user?.fullName || '—',
+    userEmail: txn.user?.email || txn.userId || '—',
+    plan: txn.plan?.name || txn.description || '—',
+    method: txn.paymentMethod || '—',
+    amount: Number(txn.amount) || 0,
+    createdAt: formatDateTime(txn.createdAt),
+    createdAtRaw: txn.createdAt,
+    status: statusMap[txn.status] || 'pending',
+    description: txn.description || '',
+  };
 }
 
-function RevenueLineChart({ data }: { data: RevenuePoint[] }) {
+function mapInvoiceToRow(inv: InvoiceItem): InvoiceRow {
+  const statusMap: Record<string, InvoiceRow['status']> = {
+    PAID: 'paid',
+    PENDING: 'unpaid',
+    FAILED: 'cancelled',
+    CANCELLED: 'cancelled',
+  };
+  return {
+    id: inv.id,
+    code: inv.invoiceCode,
+    txnRef: inv.txnRef || '—',
+    userName: inv.user?.fullName || '—',
+    userEmail: inv.user?.email || inv.userId,
+    plan: inv.plan?.name || inv.planId,
+    method: inv.paymentMethod || '—',
+    amount: Number(inv.amount) || 0,
+    createdAt: formatDateTime(inv.createdAt),
+    createdAtRaw: inv.createdAt || '',
+    paidAt: formatDateTime(inv.paidAt),
+    status: statusMap[inv.status] || 'unpaid',
+  };
+}
+
+function RevenueLineChart({ data }: { data: LineChartPoint[] }) {
   const chartWidth = 640;
-  const chartHeight = 230;
-  const paddingX = 86;
-  const paddingY = 26;
+  const chartHeight = 220;
+  const paddingX = 78;
+  const paddingY = 28;
   const innerWidth = chartWidth - paddingX * 2;
   const innerHeight = chartHeight - paddingY * 2;
-  const maxValue = Math.max(...data.map((item) => item.value), 1);
-
+  const maxValue = Math.max(...data.map((item) => Number(item.value || 0)), 1);
   const points = data.map((item, index) => {
-    const x =
-      paddingX +
-      (data.length <= 1
-        ? innerWidth / 2
-        : (index * innerWidth) / (data.length - 1));
-
-    const y =
-      paddingY +
-      innerHeight -
-      (Number(item.value || 0) / maxValue) * innerHeight;
-
+    const x = paddingX + (data.length <= 1 ? innerWidth / 2 : (index * innerWidth) / (data.length - 1));
+    const y = paddingY + innerHeight - (Number(item.value || 0) / maxValue) * innerHeight;
     return { ...item, x, y };
   });
-
   const linePoints = points.map((point) => `${point.x},${point.y}`).join(' ');
   const areaPoints = points.length
-    ? `${paddingX},${chartHeight - paddingY} ${linePoints} ${chartWidth - paddingX
-    },${chartHeight - paddingY}`
+    ? `${paddingX},${chartHeight - paddingY} ${linePoints} ${chartWidth - paddingX},${chartHeight - paddingY}`
     : '';
 
-  if (!data.length || data.every((item) => item.value === 0)) {
+  if (!data.length || data.every((d) => d.value === 0)) {
     return (
-      <div className="rounded-2xl border border-dashed border-border bg-muted/20 py-14 text-center text-muted-foreground">
-        Chưa có giao dịch thành công để vẽ biểu đồ doanh thu.
+      <div className="rounded-2xl border border-dashed border-border bg-muted/20 py-14 text-center text-sm text-muted-foreground">
+        Chưa có doanh thu trong khoảng đã chọn.
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-2xl border border-border bg-muted/20 p-4">
-        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Đơn vị: VNĐ
-        </p>
-
-        <svg
-          viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-          className="h-64 w-full overflow-visible"
-          role="img"
-        >
-          <defs>
-            <linearGradient
-              id="finance-revenue-line"
-              x1="0"
-              y1="0"
-              x2="1"
-              y2="0"
-            >
-              <stop offset="0%" stopColor="#0ea5e9" />
-              <stop offset="100%" stopColor="#9333ea" />
-            </linearGradient>
-
-            <linearGradient
-              id="finance-revenue-area"
-              x1="0"
-              y1="0"
-              x2="0"
-              y2="1"
-            >
-              <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.24" />
-              <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.02" />
-            </linearGradient>
-          </defs>
-
-          {[0, 1, 2, 3].map((line) => {
-            const y = paddingY + (line * innerHeight) / 3;
-            const labelValue = Math.round(
-              maxValue - (line * maxValue) / 3,
-            );
-
-            return (
-              <g key={line}>
-                <line
-                  x1={paddingX}
-                  x2={chartWidth - paddingX}
-                  y1={y}
-                  y2={y}
-                  className="stroke-border"
-                  strokeDasharray="5 8"
-                />
-                <text
-                  x={paddingX - 14}
-                  y={y + 4}
-                  textAnchor="end"
-                  className="fill-muted-foreground text-[10px]"
-                >
-                  {labelValue.toLocaleString('vi-VN')}
-                </text>
-              </g>
-            );
-          })}
-
-          <polygon points={areaPoints} fill="url(#finance-revenue-area)" />
-
-          <polyline
-            points={linePoints}
-            fill="none"
-            stroke="url(#finance-revenue-line)"
-            strokeWidth="5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-
-          {points.map((point) => (
-            <g key={point.key}>
-              <circle
-                cx={point.x}
-                cy={point.y}
-                r="7"
-                className="fill-background"
-                stroke="url(#finance-revenue-line)"
-                strokeWidth="4"
-              />
-              <circle cx={point.x} cy={point.y} r="3" fill="#0ea5e9" />
-              <text
-                x={point.x}
-                y={point.y - 14}
-                textAnchor="middle"
-                className="fill-foreground text-[11px] font-semibold"
-              >
-                {formatCurrency(point.value)}
+    <div className="rounded-2xl border border-border bg-muted/20 p-4">
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Đơn vị: VNĐ</p>
+      <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="h-56 w-full overflow-visible" role="img">
+        <defs>
+          <linearGradient id="finance-revenue-line" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#0ea5e9" />
+            <stop offset="100%" stopColor="#6366f1" />
+          </linearGradient>
+          <linearGradient id="finance-revenue-area" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.22" />
+            <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+        {[0, 1, 2, 3].map((line) => {
+          const y = paddingY + (line * innerHeight) / 3;
+          const labelValue = Math.round(maxValue - (line * maxValue) / 3);
+          return (
+            <g key={line}>
+              <line x1={paddingX} x2={chartWidth - paddingX} y1={y} y2={y} className="stroke-border" strokeDasharray="5 8" />
+              <text x={paddingX - 10} y={y + 4} textAnchor="end" className="fill-muted-foreground text-[10px]">
+                {labelValue.toLocaleString('vi-VN')}
               </text>
             </g>
-          ))}
-        </svg>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+          );
+        })}
+        <polygon points={areaPoints} fill="url(#finance-revenue-area)" />
+        <polyline points={linePoints} fill="none" stroke="url(#finance-revenue-line)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
         {points.map((point) => (
-          <div
-            key={point.key}
-            className="rounded-xl border border-border bg-muted/20 p-2 text-center"
-          >
-            <p className="truncate text-xs font-medium">{point.label}</p>
-            <p className="mt-1 text-sm font-bold text-sky-500">
-              {formatCurrency(point.value)}
-            </p>
-          </div>
+          <g key={point.key}>
+            <circle cx={point.x} cy={point.y} r="5" className="fill-background" stroke="url(#finance-revenue-line)" strokeWidth="3" />
+            <text x={point.x} y={chartHeight - 8} textAnchor="middle" className="fill-muted-foreground text-[10px]">
+              {point.label}
+            </text>
+          </g>
         ))}
-      </div>
+      </svg>
     </div>
   );
 }
 
-function TransactionStatusBadge({ status }: { status: TransactionStatus }) {
-  switch (status) {
-    case 'SUCCESS':
-      return (
-        <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">
-          Thành công
-        </Badge>
-      );
-
-    case 'WAITING_CONFIRMATION':
-      return (
-        <Badge className="bg-amber-500 text-white hover:bg-amber-500">
-          Chờ Admin duyệt
-        </Badge>
-      );
-
-    case 'PROCESSING':
-      return (
-        <Badge className="bg-sky-600 text-white hover:bg-sky-600">
-          Đang xử lý
-        </Badge>
-      );
-
-    case 'PENDING':
-      return <Badge variant="secondary">Chờ chuyển khoản</Badge>;
-
-    case 'FAILED':
-      return <Badge variant="destructive">Thất bại</Badge>;
-
-    case 'CANCELLED':
-      return <Badge variant="outline">Đã hủy</Badge>;
-
-    default:
-      return <Badge variant="outline">{status || 'UNKNOWN'}</Badge>;
-  }
-}
-
 export function AdminFinancePage() {
-  const [activeTab, setActiveTab] = useState<
-    'dashboard' | 'storage' | 'payment' | 'invoice'
-  >('dashboard');
-
-  const [transactions, setTransactions] = useState<TransactionItem[]>([]);
-  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'payments' | 'invoices'>('dashboard');
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [approvingId, setApprovingId] = useState<string | null>(null);
-  const [viewingPayment, setViewingPayment] =
-    useState<TransactionItem | null>(null);
 
-  const [paymentSearch, setPaymentSearch] = useState('');
-  const [paymentMethodFilter, setPaymentMethodFilter] = useState('');
-  const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
+  // Shared filters
+  const [userSearch, setUserSearch] = useState('');
+  const [searchDraft, setSearchDraft] = useState('');
+  const [datePreset, setDatePreset] = useState<DatePreset>('30d');
+  const [fromDate, setFromDate] = useState(() => getPresetRange('30d').fromDate);
+  const [toDate, setToDate] = useState(() => getPresetRange('30d').toDate);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [methodFilter, setMethodFilter] = useState('');
+
+  const [payments, setPayments] = useState<PaymentRow[]>([]);
+  const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
+  const [summary, setSummary] = useState({ total: 0, success: 0, failed: 0, pending: 0, revenue: 0 });
+
   const [paymentPage, setPaymentPage] = useState(1);
-
-  const [planSearch, setPlanSearch] = useState('');
-  const [planPage, setPlanPage] = useState(1);
-
-  const [invoiceSearch, setInvoiceSearch] = useState('');
   const [invoicePage, setInvoicePage] = useState(1);
 
-  const loadFinanceData = useCallback(async (showRefreshToast = false) => {
-    try {
-      if (showRefreshToast) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
+  const [viewingPayment, setViewingPayment] = useState<PaymentRow | null>(null);
+  const [viewingInvoice, setViewingInvoice] = useState<InvoiceRow | null>(null);
 
-      const [transactionData, planData] = await Promise.all([
-        getAllTransactions(),
-        getSubscriptionPlans(),
+  const filterParams = useMemo(() => {
+    const params: Record<string, string | undefined> = {
+      search: userSearch || undefined,
+      fromDate: fromDate || undefined,
+      toDate: toDate || undefined,
+      paymentMethod: methodFilter || undefined,
+    };
+    if (statusFilter) {
+      // map UI status to API for each endpoint differently — handled below
+      params.status = statusFilter;
+    }
+    return params;
+  }, [userSearch, fromDate, toDate, statusFilter, methodFilter]);
+
+  const loadFinanceData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const txnStatus =
+        statusFilter === 'success'
+          ? 'SUCCESS'
+          : statusFilter === 'failed'
+            ? 'FAILED'
+            : statusFilter === 'pending'
+              ? 'PENDING'
+              : statusFilter === 'paid'
+                ? 'SUCCESS'
+                : statusFilter === 'unpaid'
+                  ? 'PENDING'
+                  : statusFilter === 'cancelled'
+                    ? 'FAILED'
+                    : undefined;
+
+      const invStatus =
+        statusFilter === 'paid' || statusFilter === 'success'
+          ? 'PAID'
+          : statusFilter === 'unpaid' || statusFilter === 'pending'
+            ? 'PENDING'
+            : statusFilter === 'cancelled' || statusFilter === 'failed'
+              ? 'FAILED'
+              : undefined;
+
+      const [apiTxns, apiInvoices] = await Promise.all([
+        getAllTransactions({
+          search: filterParams.search,
+          fromDate: filterParams.fromDate,
+          toDate: filterParams.toDate,
+          paymentMethod: filterParams.paymentMethod,
+          status: txnStatus,
+        }),
+        getAllInvoicesAdmin({
+          search: filterParams.search,
+          fromDate: filterParams.fromDate,
+          toDate: filterParams.toDate,
+          status: invStatus,
+          paymentMethod: filterParams.paymentMethod,
+        }),
       ]);
 
-      setTransactions(
-        Array.isArray(transactionData) ? transactionData : [],
+      const txnList = apiTxns?.transactions || [];
+      setPayments(txnList.map(mapTxnToRow));
+      setSummary(
+        apiTxns?.summary || {
+          total: txnList.length,
+          success: txnList.filter((t: any) => t.status === 'SUCCESS').length,
+          failed: txnList.filter((t: any) => t.status === 'FAILED').length,
+          pending: txnList.filter((t: any) => t.status === 'PENDING').length,
+          revenue: txnList
+            .filter((t: any) => t.status === 'SUCCESS')
+            .reduce((s: number, t: any) => s + Number(t.amount || 0), 0),
+        }
       );
-      setPlans(Array.isArray(planData) ? planData : []);
-
-      if (showRefreshToast) {
-        toast.success('Đã tải lại dữ liệu tài chính');
-      }
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Không thể tải dữ liệu tài chính';
-
-      toast.error(message);
-      console.error(error);
+      setInvoices(apiInvoices.map(mapInvoiceToRow));
+      setPaymentPage(1);
+      setInvoicePage(1);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Không tải được dữ liệu tài chính');
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
-  }, []);
+  }, [filterParams, statusFilter]);
 
   useEffect(() => {
-    void loadFinanceData();
+    loadFinanceData();
   }, [loadFinanceData]);
 
-  const successfulTransactions = useMemo(
-    () => transactions.filter((item) => item.status === 'SUCCESS'),
-    [transactions],
-  );
+  const applySearch = () => {
+    setUserSearch(searchDraft.trim());
+  };
 
-  const totalRevenue = useMemo(
-    () =>
-      successfulTransactions.reduce(
-        (sum, item) => sum + Number(item.amount || 0),
-        0,
-      ),
-    [successfulTransactions],
-  );
+  const clearFilters = () => {
+    setSearchDraft('');
+    setUserSearch('');
+    setStatusFilter('');
+    setMethodFilter('');
+    setDatePreset('30d');
+    const range = getPresetRange('30d');
+    setFromDate(range.fromDate);
+    setToDate(range.toDate);
+  };
 
-  const waitingCount = useMemo(
-    () =>
-      transactions.filter(
-        (item) => item.status === 'WAITING_CONFIRMATION',
-      ).length,
-    [transactions],
-  );
+  const applyPreset = (preset: DatePreset) => {
+    setDatePreset(preset);
+    if (preset === 'custom') return;
+    const range = getPresetRange(preset);
+    setFromDate(range.fromDate);
+    setToDate(range.toDate);
+  };
 
-  const proUsers = useMemo(
-    () =>
-      new Set(
-        successfulTransactions
-          .map((item) => item.user?.id)
-          .filter(Boolean),
-      ).size,
-    [successfulTransactions],
-  );
+  const chartData = useMemo(() => {
+    const buckets: LineChartPoint[] = [];
+    const start = fromDate ? new Date(fromDate) : new Date(Date.now() - 29 * 86400000);
+    const end = toDate ? new Date(toDate) : new Date();
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
 
-  const revenueTrend = useMemo<RevenuePoint[]>(() => {
-    const now = new Date();
+    const daySpan = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / 86400000) + 1);
+    const useDaily = daySpan <= 45;
 
-    return Array.from({ length: 6 }, (_, index) => {
-      const date = new Date(
-        now.getFullYear(),
-        now.getMonth() - (5 - index),
-        1,
-      );
+    if (useDaily) {
+      for (let i = 0; i < daySpan; i++) {
+        const d = new Date(start);
+        d.setDate(start.getDate() + i);
+        buckets.push({
+          key: toInputDate(d),
+          label: `${d.getDate()}/${d.getMonth() + 1}`,
+          value: 0,
+        });
+      }
+      payments
+        .filter((p) => p.status === 'success')
+        .forEach((p) => {
+          const key = toInputDate(new Date(p.createdAtRaw));
+          const bucket = buckets.find((b) => b.key === key);
+          if (bucket) bucket.value += p.amount;
+        });
+      // sample to at most 12 points for readability
+      if (buckets.length > 12) {
+        const step = Math.ceil(buckets.length / 12);
+        return buckets.filter((_, i) => i % step === 0 || i === buckets.length - 1);
+      }
+      return buckets;
+    }
 
-      const month = date.getMonth();
-      const year = date.getFullYear();
-
-      const value = successfulTransactions
-        .filter((transaction) => {
-          const source = transaction.paidAt || transaction.createdAt;
-          const transactionDate = new Date(source);
-
-          return (
-            transactionDate.getMonth() === month &&
-            transactionDate.getFullYear() === year
-          );
-        })
-        .reduce(
-          (sum, transaction) => sum + Number(transaction.amount || 0),
-          0,
-        );
-
-      return {
-        key: `${year}-${month + 1}`,
-        label: `T${month + 1}`,
-        value,
-      };
-    });
-  }, [successfulTransactions]);
+    // month buckets
+    const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+    while (cursor <= end) {
+      buckets.push({
+        key: `${cursor.getFullYear()}-${cursor.getMonth()}`,
+        label: `T${cursor.getMonth() + 1}`,
+        value: 0,
+      });
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+    payments
+      .filter((p) => p.status === 'success')
+      .forEach((p) => {
+        const d = new Date(p.createdAtRaw);
+        const key = `${d.getFullYear()}-${d.getMonth()}`;
+        const bucket = buckets.find((b) => b.key === key);
+        if (bucket) bucket.value += p.amount;
+      });
+    return buckets;
+  }, [payments, fromDate, toDate]);
 
   const topPlans = useMemo(() => {
-    const counts = new Map<string, number>();
-
-    successfulTransactions.forEach((transaction) => {
-      const planName = transaction.plan?.name || 'Không xác định';
-      counts.set(planName, (counts.get(planName) || 0) + 1);
-    });
-
-    return Array.from(counts.entries())
-      .map(([name, sold]) => ({ name, sold }))
+    const map = new Map<string, { name: string; sold: number; revenue: number }>();
+    payments
+      .filter((p) => p.status === 'success')
+      .forEach((p) => {
+        const name = p.plan || 'Khác';
+        const prev = map.get(name) || { name, sold: 0, revenue: 0 };
+        prev.sold += 1;
+        prev.revenue += p.amount;
+        map.set(name, prev);
+      });
+    return Array.from(map.values())
       .sort((a, b) => b.sold - a.sold)
       .slice(0, 5);
-  }, [successfulTransactions]);
+  }, [payments]);
 
-  const paymentMethodStats = useMemo(() => {
-    const counts = new Map<string, number>();
-
-    transactions.forEach((transaction) => {
-      const method = transaction.paymentMethod || 'Không xác định';
-      counts.set(method, (counts.get(method) || 0) + 1);
+  const methodStats = useMemo(() => {
+    const map = new Map<string, number>();
+    payments.forEach((p) => {
+      const key = p.method || 'Khác';
+      map.set(key, (map.get(key) || 0) + 1);
     });
+    const total = payments.length || 1;
+    return Array.from(map.entries()).map(([method, count]) => ({
+      method,
+      count,
+      ratio: Math.round((count / total) * 100),
+    }));
+  }, [payments]);
 
-    return Array.from(counts.entries())
-      .map(([method, count]) => ({ method, count }))
-      .sort((a, b) => b.count - a.count);
-  }, [transactions]);
+  const uniquePayingUsers = useMemo(() => {
+    const set = new Set(
+      payments.filter((p) => p.status === 'success').map((p) => p.userEmail)
+    );
+    return set.size;
+  }, [payments]);
 
-  const totalPaymentCount = transactions.length;
+  const totalPaymentPages = Math.max(1, Math.ceil(payments.length / PAGE_SIZE));
+  const paginatedPayments = payments.slice((paymentPage - 1) * PAGE_SIZE, paymentPage * PAGE_SIZE);
 
-  const dashboardStats = [
+  const totalInvoicePages = Math.max(1, Math.ceil(invoices.length / PAGE_SIZE));
+  const paginatedInvoices = invoices.slice((invoicePage - 1) * PAGE_SIZE, invoicePage * PAGE_SIZE);
+
+  const paymentStatusBadge = (status: PaymentRow['status']) => {
+    if (status === 'success') return <Badge className="bg-emerald-600 hover:bg-emerald-600">Thành công</Badge>;
+    if (status === 'pending') return <Badge variant="secondary">Đang chờ</Badge>;
+    return <Badge variant="destructive">Thất bại</Badge>;
+  };
+
+  const invoiceStatusBadge = (status: InvoiceRow['status']) => {
+    if (status === 'paid') return <Badge className="bg-emerald-600 hover:bg-emerald-600">Đã thanh toán</Badge>;
+    if (status === 'unpaid') return <Badge variant="secondary">Chưa thanh toán</Badge>;
+    return <Badge variant="destructive">Thất bại / Hủy</Badge>;
+  };
+
+  const Pagination = ({
+    page,
+    totalPages,
+    onChange,
+  }: {
+    page: number;
+    totalPages: number;
+    onChange: (p: number) => void;
+  }) => (
+    <div className="flex items-center justify-end gap-2 pt-4">
+      <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onChange(page - 1)} className="rounded-lg">
+        <ChevronLeft className="w-4 h-4" />
+      </Button>
+      <span className="text-xs text-muted-foreground">
+        Trang {page}/{totalPages}
+      </span>
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={page >= totalPages}
+        onClick={() => onChange(page + 1)}
+        className="rounded-lg"
+      >
+        <ChevronRight className="w-4 h-4" />
+      </Button>
+    </div>
+  );
+
+  const kpiCards = [
     {
-      title: 'Tổng doanh thu',
-      value: formatCurrency(totalRevenue),
-      icon: Wallet,
-      description: 'Giao dịch đã thành công',
+      title: 'Doanh thu',
+      value: formatCurrency(summary.revenue),
+      description: 'Giao dịch thành công trong khoảng đã chọn',
+      icon: TrendingUp,
     },
     {
       title: 'Tổng giao dịch',
-      value: transactions.length.toLocaleString('vi-VN'),
+      value: summary.total.toLocaleString('vi-VN'),
+      description: `${summary.success} thành công · ${summary.failed} thất bại`,
       icon: ArrowLeftRight,
-      description: 'Trong hệ thống',
     },
     {
-      title: 'Chờ duyệt',
-      value: waitingCount.toLocaleString('vi-VN'),
-      icon: CreditCard,
-      description: 'Cần Admin kiểm tra',
+      title: 'Hóa đơn',
+      value: invoices.length.toLocaleString('vi-VN'),
+      description: `${invoices.filter((i) => i.status === 'paid').length} đã thanh toán`,
+      icon: Receipt,
     },
     {
-      title: 'Người dùng Pro',
-      value: proUsers.toLocaleString('vi-VN'),
-      icon: Crown,
-      description: 'Đã thanh toán thành công',
+      title: 'Người thanh toán',
+      value: uniquePayingUsers.toLocaleString('vi-VN'),
+      description: 'User có giao dịch thành công',
+      icon: Users,
     },
   ];
 
-  const filteredTransactions = useMemo(() => {
-    const search = normalizeSearchText(paymentSearch);
-
-    return transactions.filter((transaction) => {
-      const code = getTransactionCode(transaction);
-      const email = transaction.user?.email || '';
-      const fullName = transaction.user?.fullName || '';
-      const planName = transaction.plan?.name || '';
-      const method = transaction.paymentMethod || '';
-
-      const matchesSearch =
-        !search ||
-        normalizeSearchText(code).includes(search) ||
-        normalizeSearchText(email).includes(search) ||
-        normalizeSearchText(fullName).includes(search) ||
-        normalizeSearchText(planName).includes(search);
-
-      const matchesMethod =
-        !paymentMethodFilter || method === paymentMethodFilter;
-
-      const matchesStatus =
-        !paymentStatusFilter ||
-        transaction.status === paymentStatusFilter;
-
-      return matchesSearch && matchesMethod && matchesStatus;
-    });
-  }, [
-    transactions,
-    paymentSearch,
-    paymentMethodFilter,
-    paymentStatusFilter,
-  ]);
-
-  const totalPaymentPages = Math.max(
-    1,
-    Math.ceil(filteredTransactions.length / PAYMENT_PAGE_SIZE),
-  );
-
-  const paginatedTransactions = filteredTransactions.slice(
-    (paymentPage - 1) * PAYMENT_PAGE_SIZE,
-    paymentPage * PAYMENT_PAGE_SIZE,
-  );
-
-  const filteredPlans = useMemo(() => {
-    const search = normalizeSearchText(planSearch);
-
-    return plans.filter(
-      (plan) =>
-        !search ||
-        normalizeSearchText(plan.name).includes(search) ||
-        normalizeSearchText(plan.code).includes(search),
-    );
-  }, [plans, planSearch]);
-
-  const totalPlanPages = Math.max(
-    1,
-    Math.ceil(filteredPlans.length / PLAN_PAGE_SIZE),
-  );
-
-  const paginatedPlans = filteredPlans.slice(
-    (planPage - 1) * PLAN_PAGE_SIZE,
-    planPage * PLAN_PAGE_SIZE,
-  );
-
-  const invoices = useMemo<InvoiceItem[]>(
-    () =>
-      successfulTransactions.map((transaction) => ({
-        id: transaction.id,
-        code: `HD-${getTransactionCode(transaction)}`,
-        user:
-          transaction.user?.email ||
-          transaction.user?.fullName ||
-          'Không xác định',
-        plan: transaction.plan?.name || 'Không xác định',
-        method: transaction.paymentMethod || 'Không xác định',
-        amount: Number(transaction.amount || 0),
-        createdAt: transaction.paidAt || transaction.createdAt,
-        status: 'PAID',
-      })),
-    [successfulTransactions],
-  );
-
-  const filteredInvoices = useMemo(() => {
-    const search = normalizeSearchText(invoiceSearch);
-
-    return invoices.filter(
-      (invoice) =>
-        !search ||
-        normalizeSearchText(invoice.code).includes(search) ||
-        normalizeSearchText(invoice.user).includes(search) ||
-        normalizeSearchText(invoice.plan).includes(search),
-    );
-  }, [invoices, invoiceSearch]);
-
-  const totalInvoicePages = Math.max(
-    1,
-    Math.ceil(filteredInvoices.length / INVOICE_PAGE_SIZE),
-  );
-
-  const paginatedInvoices = filteredInvoices.slice(
-    (invoicePage - 1) * INVOICE_PAGE_SIZE,
-    invoicePage * INVOICE_PAGE_SIZE,
-  );
-
-  const paymentMethods = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          transactions
-            .map((transaction) => transaction.paymentMethod)
-            .filter((value): value is string => Boolean(value)),
-        ),
-      ),
-    [transactions],
-  );
-
-  const handleApprove = async (transaction: TransactionItem) => {
-    const confirmed = window.confirm(
-      `Xác nhận bạn đã kiểm tra tài khoản ngân hàng và muốn duyệt giao dịch ${getTransactionCode(
-        transaction,
-      )} với số tiền ${formatCurrency(transaction.amount)}?`,
-    );
-
-    if (!confirmed) return;
-
-    try {
-      setApprovingId(transaction.id);
-      await approveTransaction(transaction.id);
-
-      toast.success('Đã duyệt giao dịch và kích hoạt gói thành công');
-
-      setViewingPayment(null);
-      await loadFinanceData();
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Không thể duyệt giao dịch';
-
-      toast.error(message);
-      console.error(error);
-    } finally {
-      setApprovingId(null);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex min-h-[55vh] flex-col items-center justify-center gap-3">
-        <Loader2 className="h-9 w-9 animate-spin text-indigo-500" />
-        <p className="text-sm text-muted-foreground">
-          Đang tải dữ liệu tài chính...
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6 text-slate-900 dark:text-slate-100">
+    <div className="space-y-6 text-[#121214] selection:bg-[#121214] selection:text-white">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 via-indigo-500 to-fuchsia-500 shadow-lg shadow-fuchsia-500/30">
-            <Wallet className="h-6 w-6 text-white" />
+          <div className="w-12 h-12 bg-[#121214] rounded-xl flex items-center justify-center shadow-sm">
+            <Wallet className="w-6 h-6 text-white" />
           </div>
-
           <div>
-            <h1 className="text-3xl font-bold">Quản lý Tài chính</h1>
-            <p className="mt-1 text-muted-foreground">
-              Quản lý giao dịch chuyển khoản, gói lưu trữ và hóa đơn.
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Quản lý Tài chính</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {loading ? 'Đang tải dữ liệu...' : 'Doanh thu, giao dịch và hóa đơn'}
             </p>
           </div>
         </div>
-
-        <Button
-          type="button"
-          variant="outline"
-          className="gap-2 rounded-xl"
-          disabled={refreshing}
-          onClick={() => void loadFinanceData(true)}
-        >
-          <RefreshCw
-            className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`}
-          />
-          Tải lại
+        <Button variant="outline" onClick={loadFinanceData} disabled={loading} className="rounded-xl gap-2 self-start">
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          Làm mới
         </Button>
       </div>
 
-      <Tabs
-        value={activeTab}
-        onValueChange={(value) =>
-          setActiveTab(value as typeof activeTab)
-        }
-      >
-        <TabsList className="w-full sm:w-fit">
+      {/* Filter bar */}
+      <Card className={glowCard}>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-sky-500" />
+            <CardTitle className="text-base">Bộ lọc</CardTitle>
+          </div>
+          <CardDescription>Lọc theo tên/email user, khoảng thời gian, trạng thái và phương thức thanh toán.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            {(
+              [
+                ['7d', '7 ngày'],
+                ['30d', '30 ngày'],
+                ['month', 'Tháng này'],
+                ['all', 'Tất cả'],
+                ['custom', 'Tùy chọn'],
+              ] as [DatePreset, string][]
+            ).map(([key, label]) => (
+              <Button
+                key={key}
+                type="button"
+                size="sm"
+                variant={datePreset === key ? 'default' : 'outline'}
+                className={`rounded-full ${datePreset === key ? 'bg-sky-600 hover:bg-sky-700 text-white' : ''}`}
+                onClick={() => applyPreset(key)}
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-3">
+            <div className="xl:col-span-2 space-y-1.5">
+              <Label className="text-xs font-semibold text-muted-foreground">Tìm user (tên / email)</Label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    value={searchDraft}
+                    onChange={(e) => setSearchDraft(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && applySearch()}
+                    placeholder="VD: Nguyen Van A / email@..."
+                    className="pl-9 rounded-xl"
+                  />
+                </div>
+                <Button type="button" onClick={applySearch} className="rounded-xl bg-sky-600 hover:bg-sky-700 text-white">
+                  Tìm
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                <CalendarRange className="w-3.5 h-3.5" /> Từ ngày
+              </Label>
+              <Input
+                type="date"
+                value={fromDate}
+                onChange={(e) => {
+                  setDatePreset('custom');
+                  setFromDate(e.target.value);
+                }}
+                className="rounded-xl"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-muted-foreground">Đến ngày</Label>
+              <Input
+                type="date"
+                value={toDate}
+                onChange={(e) => {
+                  setDatePreset('custom');
+                  setToDate(e.target.value);
+                }}
+                className="rounded-xl"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-muted-foreground">Trạng thái</Label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full h-10 rounded-xl border border-input bg-background px-3 text-sm"
+              >
+                <option value="">Tất cả</option>
+                <option value="success">Thành công / Đã thanh toán</option>
+                <option value="pending">Đang chờ / Chưa thanh toán</option>
+                <option value="failed">Thất bại / Hủy</option>
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-muted-foreground">Phương thức</Label>
+              <select
+                value={methodFilter}
+                onChange={(e) => setMethodFilter(e.target.value)}
+                className="w-full h-10 rounded-xl border border-input bg-background px-3 text-sm"
+              >
+                <option value="">Tất cả</option>
+                <option value="VNPAY">VNPay</option>
+                <option value="MOMO">MoMo</option>
+                <option value="PAYOS">PayOS</option>
+              </select>
+            </div>
+          </div>
+
+          {(userSearch || statusFilter || methodFilter || datePreset !== '30d') && (
+            <div className="flex flex-wrap items-center gap-2">
+              {userSearch && (
+                <Badge variant="secondary" className="gap-1 rounded-full">
+                  User: {userSearch}
+                  <button type="button" onClick={() => { setUserSearch(''); setSearchDraft(''); }}>
+                    <X className="w-3 h-3" />
+                  </button>
+                </Badge>
+              )}
+              <Button type="button" variant="ghost" size="sm" onClick={clearFilters} className="text-xs rounded-full">
+                Xóa bộ lọc
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
+        <TabsList className="w-full sm:w-fit flex-wrap h-auto">
           <TabsTrigger value="dashboard" className="gap-2">
-            <LayoutDashboard className="h-4 w-4" />
-            Dashboard
+            <LayoutDashboard className="w-4 h-4" />
+            Tổng quan
           </TabsTrigger>
-
-          <TabsTrigger value="storage" className="gap-2">
-            <HardDrive className="h-4 w-4" />
-            Gói lưu trữ
+          <TabsTrigger value="payments" className="gap-2">
+            <CreditCard className="w-4 h-4" />
+            Giao dịch
           </TabsTrigger>
-
-          <TabsTrigger value="payment" className="gap-2">
-            <CreditCard className="h-4 w-4" />
-            Thanh toán
-            {waitingCount > 0 && (
-              <span className="ml-1 rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
-                {waitingCount}
-              </span>
-            )}
-          </TabsTrigger>
-
-          <TabsTrigger value="invoice" className="gap-2">
-            <Receipt className="h-4 w-4" />
+          <TabsTrigger value="invoices" className="gap-2">
+            <Receipt className="w-4 h-4" />
             Hóa đơn
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="dashboard" className="mt-6 space-y-6">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {dashboardStats.map((item) => (
+        {/* ===================== DASHBOARD ===================== */}
+        <TabsContent value="dashboard" className="space-y-6 mt-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            {kpiCards.map((item) => (
               <Card key={item.title} className={glowCard}>
-                <CardHeader>
-                  <div className="flex items-center justify-between gap-4">
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between gap-3">
                     <div>
-                      <CardTitle>{item.title}</CardTitle>
-                      <CardDescription>{item.description}</CardDescription>
+                      <CardDescription className="text-xs uppercase tracking-wide">{item.title}</CardDescription>
+                      <CardTitle className="text-2xl mt-1 tabular-nums">{item.value}</CardTitle>
                     </div>
-
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                      <item.icon className="h-5 w-5" />
+                    <div className="h-10 w-10 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center">
+                      <item.icon className="w-5 h-5" />
                     </div>
                   </div>
                 </CardHeader>
-
-                <CardContent className="pt-0">
-                  <p className="truncate text-2xl font-bold sm:text-3xl">
-                    {item.value}
-                  </p>
+                <CardContent>
+                  <p className="text-xs text-muted-foreground">{item.description}</p>
                 </CardContent>
               </Card>
             ))}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_0.6fr]">
+          <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_0.9fr] gap-4">
             <Card className={glowCard}>
               <CardHeader>
-                <CardTitle>Biểu đồ doanh thu</CardTitle>
-                <CardDescription>
-                  Doanh thu thật từ các giao dịch SUCCESS trong 6 tháng gần nhất.
-                </CardDescription>
+                <CardTitle className="text-base">Doanh thu theo thời gian</CardTitle>
+                <CardDescription>Chỉ tính giao dịch thành công trong khoảng lọc hiện tại.</CardDescription>
               </CardHeader>
-
               <CardContent>
-                <RevenueLineChart data={revenueTrend} />
+                <RevenueLineChart data={chartData} />
               </CardContent>
             </Card>
 
-            <Card className={glowCard}>
-              <CardHeader>
-                <CardTitle>Top gói bán chạy</CardTitle>
-                <CardDescription>
-                  Xếp theo số giao dịch thành công.
-                </CardDescription>
-              </CardHeader>
-
-              <CardContent className="space-y-3">
-                {topPlans.length === 0 ? (
-                  <p className="rounded-xl border border-dashed border-border py-8 text-center text-sm text-muted-foreground">
-                    Chưa có dữ liệu.
-                  </p>
-                ) : (
-                  topPlans.map((plan, index) => (
-                    <div
-                      key={plan.name}
-                      className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-muted/50 p-3"
-                    >
-                      <div className="flex min-w-0 items-center gap-3">
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                          {index + 1}
-                        </span>
-                        <span className="truncate text-sm font-semibold">
-                          {plan.name}
-                        </span>
+            <div className="space-y-4">
+              <Card className={glowCard}>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center gap-2">
+                    <Crown className="w-4 h-4 text-amber-500" />
+                    <CardTitle className="text-base">Top gói bán chạy</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {topPlans.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-6 text-center">Chưa có dữ liệu bán gói.</p>
+                  ) : (
+                    topPlans.map((plan, index) => (
+                      <div
+                        key={plan.name}
+                        className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-muted/30 px-3 py-2.5"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="h-6 w-6 rounded-full bg-sky-500/15 text-sky-600 text-[11px] font-bold flex items-center justify-center">
+                            {index + 1}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold truncate">{plan.name}</p>
+                            <p className="text-[11px] text-muted-foreground">{formatCurrency(plan.revenue)}</p>
+                          </div>
+                        </div>
+                        <span className="text-xs font-semibold shrink-0">{plan.sold} lượt</span>
                       </div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
 
-                      <span className="shrink-0 text-sm text-muted-foreground">
-                        {plan.sold} lượt
-                      </span>
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
+              <Card className={glowCard}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Theo phương thức</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {methodStats.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-4 text-center">Chưa có giao dịch.</p>
+                  ) : (
+                    methodStats.map((item) => (
+                      <div key={item.method} className="space-y-1.5">
+                        <div className="flex justify-between text-xs">
+                          <span className="font-semibold">{item.method}</span>
+                          <span className="text-muted-foreground">
+                            {item.count} ({item.ratio}%)
+                          </span>
+                        </div>
+                        <div className="h-2 rounded-full bg-muted overflow-hidden">
+                          <div className="h-full rounded-full bg-sky-500" style={{ width: `${item.ratio}%` }} />
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </div>
 
           <Card className={glowCard}>
             <CardHeader>
-              <CardTitle>Thống kê phương thức thanh toán</CardTitle>
-              <CardDescription>
-                Tỷ lệ giao dịch theo phương thức thực tế.
-              </CardDescription>
+              <CardTitle className="text-base">Giao dịch gần đây</CardTitle>
+              <CardDescription>5 giao dịch mới nhất theo bộ lọc hiện tại</CardDescription>
             </CardHeader>
-
-            <CardContent className="space-y-4">
-              {paymentMethodStats.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Chưa có giao dịch.
-                </p>
+            <CardContent>
+              {payments.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-8 text-center">Không có giao dịch nào khớp bộ lọc.</p>
               ) : (
-                paymentMethodStats.map((item) => {
-                  const ratio = totalPaymentCount
-                    ? Math.round((item.count / totalPaymentCount) * 100)
-                    : 0;
-
-                  return (
-                    <div key={item.method} className="space-y-1.5">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-semibold">{item.method}</span>
-                        <span className="text-muted-foreground">
-                          {item.count} giao dịch · {ratio}%
-                        </span>
-                      </div>
-
-                      <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
-                        <div
-                          className="h-full rounded-full bg-primary"
-                          style={{ width: `${ratio}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="storage" className="mt-6 space-y-6">
-          <Card className={glowCard}>
-            <CardContent className="p-4 md:p-6">
-              <div className="relative max-w-sm">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  type="text"
-                  value={planSearch}
-                  onChange={(event) => {
-                    setPlanSearch(event.target.value);
-                    setPlanPage(1);
-                  }}
-                  placeholder="Tìm tên hoặc mã gói..."
-                  className="h-11 w-full rounded-xl border border-input bg-background pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-sky-400/40"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className={glowCard}>
-            <CardContent className="p-4 md:p-6">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader className="border-b border-border bg-muted/40">
-                    <TableRow>
-                      <TableHead className="px-6 py-4">Tên gói</TableHead>
-                      <TableHead className="px-4 py-4">Mã</TableHead>
-                      <TableHead className="px-4 py-4">Giá</TableHead>
-                      <TableHead className="px-4 py-4">Dung lượng</TableHead>
-                      <TableHead className="px-4 py-4">Chat/ngày</TableHead>
-                      <TableHead className="px-4 py-4">Thời hạn</TableHead>
-                      <TableHead className="px-6 py-4 text-right">
-                        Trạng thái
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-
-                  <TableBody>
-                    {paginatedPlans.map((plan) => (
-                      <TableRow key={plan.id}>
-                        <TableCell className="px-6 py-4 font-semibold">
-                          {plan.name}
-                        </TableCell>
-                        <TableCell className="px-4 py-4 text-muted-foreground">
-                          {plan.code}
-                        </TableCell>
-                        <TableCell className="px-4 py-4">
-                          {formatCurrency(plan.price)}
-                        </TableCell>
-                        <TableCell className="px-4 py-4">
-                          {bytesToGb(plan.storageLimit)}
-                        </TableCell>
-                        <TableCell className="px-4 py-4">
-                          {plan.dailyChatLimit.toLocaleString('vi-VN')}
-                        </TableCell>
-                        <TableCell className="px-4 py-4">
-                          {plan.durationDays} ngày
-                        </TableCell>
-                        <TableCell className="px-6 py-4 text-right">
-                          {plan.isActive ? (
-                            <Badge className="bg-emerald-600 text-white">
-                              Đang hoạt động
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary">Ngừng bán</Badge>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-
-                    {paginatedPlans.length === 0 && (
+                <div className="overflow-x-auto rounded-xl border border-border">
+                  <Table>
+                    <TableHeader>
                       <TableRow>
-                        <TableCell
-                          colSpan={7}
-                          className="py-10 text-center text-muted-foreground"
-                        >
-                          Không tìm thấy gói lưu trữ.
-                        </TableCell>
+                        <TableHead>User</TableHead>
+                        <TableHead>Gói</TableHead>
+                        <TableHead>Số tiền</TableHead>
+                        <TableHead>Thời gian</TableHead>
+                        <TableHead className="text-right">Trạng thái</TableHead>
                       </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-
-              {filteredPlans.length > 0 && (
-                <PaginationFooter
-                  page={planPage}
-                  pageSize={PLAN_PAGE_SIZE}
-                  totalItems={filteredPlans.length}
-                  totalPages={totalPlanPages}
-                  onPageChange={setPlanPage}
-                  label="gói"
-                />
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="payment" className="mt-6 space-y-6">
-          <Card className={glowCard}>
-            <CardContent className="space-y-4 p-4 md:p-6">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Tìm kiếm
-                  </label>
-                  <input
-                    type="text"
-                    value={paymentSearch}
-                    onChange={(event) => {
-                      setPaymentSearch(event.target.value);
-                      setPaymentPage(1);
-                    }}
-                    placeholder="Mã GD, email, tên hoặc gói..."
-                    className="h-11 w-full rounded-xl border border-input bg-background px-4 text-sm outline-none focus:ring-2 focus:ring-sky-400/40"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Phương thức
-                  </label>
-                  <select
-                    value={paymentMethodFilter}
-                    onChange={(event) => {
-                      setPaymentMethodFilter(event.target.value);
-                      setPaymentPage(1);
-                    }}
-                    className="h-11 w-full rounded-xl border border-input bg-background px-4 text-sm"
-                  >
-                    <option value="">Tất cả phương thức</option>
-                    {paymentMethods.map((method) => (
-                      <option key={method} value={method}>
-                        {method}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Trạng thái
-                  </label>
-                  <select
-                    value={paymentStatusFilter}
-                    onChange={(event) => {
-                      setPaymentStatusFilter(event.target.value);
-                      setPaymentPage(1);
-                    }}
-                    className="h-11 w-full rounded-xl border border-input bg-background px-4 text-sm"
-                  >
-                    <option value="">Tất cả trạng thái</option>
-                    <option value="WAITING_CONFIRMATION">
-                      Chờ Admin duyệt
-                    </option>
-                    <option value="PENDING">Chờ chuyển khoản</option>
-                    <option value="PROCESSING">Đang xử lý</option>
-                    <option value="SUCCESS">Thành công</option>
-                    <option value="FAILED">Thất bại</option>
-                    <option value="CANCELLED">Đã hủy</option>
-                  </select>
-                </div>
-              </div>
-
-              {(paymentSearch ||
-                paymentMethodFilter ||
-                paymentStatusFilter) && (
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-muted-foreground">
-                      Tìm thấy {filteredTransactions.length} giao dịch.
-                    </p>
-
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setPaymentSearch('');
-                        setPaymentMethodFilter('');
-                        setPaymentStatusFilter('');
-                        setPaymentPage(1);
-                      }}
-                    >
-                      Xóa bộ lọc
-                    </Button>
-                  </div>
-                )}
-            </CardContent>
-          </Card>
-
-          <Card className={glowCard}>
-            <CardContent className="p-4 md:p-6">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader className="border-b border-border bg-muted/40">
-                    <TableRow>
-                      <TableHead className="px-6 py-4">
-                        Mã giao dịch
-                      </TableHead>
-                      <TableHead className="px-4 py-4">
-                        Người dùng
-                      </TableHead>
-                      <TableHead className="px-4 py-4">Gói</TableHead>
-                      <TableHead className="px-4 py-4">
-                        Phương thức
-                      </TableHead>
-                      <TableHead className="px-4 py-4">Số tiền</TableHead>
-                      <TableHead className="px-4 py-4">Ngày tạo</TableHead>
-                      <TableHead className="px-4 py-4">
-                        Trạng thái
-                      </TableHead>
-                      <TableHead className="px-6 py-4 text-right">
-                        Thao tác
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-
-                  <TableBody>
-                    {paginatedTransactions.map((transaction) => {
-                      const isApproving =
-                        approvingId === transaction.id;
-
-                      return (
-                        <TableRow key={transaction.id}>
-                          <TableCell className="px-6 py-4 font-mono text-xs font-semibold">
-                            {getTransactionCode(transaction)}
-                          </TableCell>
-
-                          <TableCell className="px-4 py-4">
-                            <p className="font-medium">
-                              {transaction.user?.fullName ||
-                                'Chưa cập nhật tên'}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {transaction.user?.email || '—'}
-                            </p>
-                          </TableCell>
-
-                          <TableCell className="px-4 py-4">
-                            {transaction.plan?.name || '—'}
-                          </TableCell>
-
-                          <TableCell className="px-4 py-4">
-                            {transaction.paymentMethod || '—'}
-                          </TableCell>
-
-                          <TableCell className="whitespace-nowrap px-4 py-4 font-semibold">
-                            {formatCurrency(transaction.amount)}
-                          </TableCell>
-
-                          <TableCell className="px-4 py-4 text-muted-foreground">
-                            {formatDate(
-                              transaction.paidAt ||
-                              transaction.createdAt,
-                            )}
-                          </TableCell>
-
-                          <TableCell className="px-4 py-4">
-                            <TransactionStatusBadge
-                              status={transaction.status}
-                            />
-                          </TableCell>
-
-                          <TableCell className="px-6 py-4 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                title="Xem chi tiết"
-                                onClick={() =>
-                                  setViewingPayment(transaction)
-                                }
-                                className="h-8 w-8 rounded-full"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-
-                              {transaction.status ===
-                                'WAITING_CONFIRMATION' && (
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    disabled={isApproving}
-                                    onClick={() =>
-                                      void handleApprove(transaction)
-                                    }
-                                    className="gap-1.5 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700"
-                                  >
-                                    {isApproving ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <CheckCircle2 className="h-4 w-4" />
-                                    )}
-                                    {isApproving
-                                      ? 'Đang duyệt'
-                                      : 'Duyệt'}
-                                  </Button>
-                                )}
+                    </TableHeader>
+                    <TableBody>
+                      {payments.slice(0, 5).map((p) => (
+                        <TableRow key={p.id}>
+                          <TableCell>
+                            <div>
+                              <p className="text-sm font-semibold">{p.userName}</p>
+                              <p className="text-[11px] text-muted-foreground">{p.userEmail}</p>
                             </div>
                           </TableCell>
+                          <TableCell className="text-sm">{p.plan}</TableCell>
+                          <TableCell className="font-bold tabular-nums">{formatCurrency(p.amount)}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{p.createdAt}</TableCell>
+                          <TableCell className="text-right">{paymentStatusBadge(p.status)}</TableCell>
                         </TableRow>
-                      );
-                    })}
-
-                    {paginatedTransactions.length === 0 && (
-                      <TableRow>
-                        <TableCell
-                          colSpan={8}
-                          className="py-10 text-center text-muted-foreground"
-                        >
-                          Không tìm thấy giao dịch.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-
-              {filteredTransactions.length > 0 && (
-                <PaginationFooter
-                  page={paymentPage}
-                  pageSize={PAYMENT_PAGE_SIZE}
-                  totalItems={filteredTransactions.length}
-                  totalPages={totalPaymentPages}
-                  onPageChange={setPaymentPage}
-                  label="giao dịch"
-                />
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="invoice" className="mt-6 space-y-6">
+        {/* ===================== PAYMENTS ===================== */}
+        <TabsContent value="payments" className="space-y-4 mt-6">
           <Card className={glowCard}>
-            <CardContent className="p-4 md:p-6">
-              <div className="relative max-w-md">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  type="text"
-                  value={invoiceSearch}
-                  onChange={(event) => {
-                    setInvoiceSearch(event.target.value);
-                    setInvoicePage(1);
-                  }}
-                  placeholder="Tìm mã hóa đơn, email hoặc gói..."
-                  className="h-11 w-full rounded-xl border border-input bg-background pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-sky-400/40"
-                />
+            <CardHeader>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                  <CardTitle className="text-base">Danh sách giao dịch</CardTitle>
+                  <CardDescription>
+                    {loading ? 'Đang tải...' : `${payments.length} giao dịch · Doanh thu ${formatCurrency(summary.revenue)}`}
+                  </CardDescription>
+                </div>
               </div>
+            </CardHeader>
+            <CardContent>
+              {payments.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-12 text-center">Không tìm thấy giao dịch phù hợp.</p>
+              ) : (
+                <>
+                  <div className="overflow-x-auto rounded-xl border border-border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Mã GD</TableHead>
+                          <TableHead>User</TableHead>
+                          <TableHead>Gói</TableHead>
+                          <TableHead>PTTT</TableHead>
+                          <TableHead>Số tiền</TableHead>
+                          <TableHead>Thời gian</TableHead>
+                          <TableHead>Trạng thái</TableHead>
+                          <TableHead className="text-right">Chi tiết</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {paginatedPayments.map((p) => (
+                          <TableRow key={p.id}>
+                            <TableCell>
+                              <div>
+                                <p className="text-sm font-semibold truncate max-w-[120px]">{p.code}</p>
+                                <p className="text-[11px] text-muted-foreground">{p.invoiceCode}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <p className="text-sm font-medium">{p.userName}</p>
+                                <p className="text-[11px] text-muted-foreground">{p.userEmail}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-sm">{p.plan}</TableCell>
+                            <TableCell className="text-sm font-medium">{p.method}</TableCell>
+                            <TableCell className="font-bold tabular-nums">{formatCurrency(p.amount)}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{p.createdAt}</TableCell>
+                            <TableCell>{paymentStatusBadge(p.status)}</TableCell>
+                            <TableCell className="text-right">
+                              <Button variant="ghost" size="sm" className="rounded-lg" onClick={() => setViewingPayment(p)}>
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <Pagination page={paymentPage} totalPages={totalPaymentPages} onChange={setPaymentPage} />
+                </>
+              )}
             </CardContent>
           </Card>
+        </TabsContent>
 
+        {/* ===================== INVOICES ===================== */}
+        <TabsContent value="invoices" className="space-y-4 mt-6">
           <Card className={glowCard}>
-            <CardContent className="p-4 md:p-6">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader className="border-b border-border bg-muted/40">
-                    <TableRow>
-                      <TableHead className="px-6 py-4">Mã hóa đơn</TableHead>
-                      <TableHead className="px-4 py-4">Người dùng</TableHead>
-                      <TableHead className="px-4 py-4">Gói</TableHead>
-                      <TableHead className="px-4 py-4">
-                        Phương thức
-                      </TableHead>
-                      <TableHead className="px-4 py-4">Số tiền</TableHead>
-                      <TableHead className="px-4 py-4">
-                        Ngày thanh toán
-                      </TableHead>
-                      <TableHead className="px-6 py-4 text-right">
-                        Trạng thái
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-
-                  <TableBody>
-                    {paginatedInvoices.map((invoice) => (
-                      <TableRow key={invoice.id}>
-                        <TableCell className="px-6 py-4 font-mono text-xs font-semibold">
-                          {invoice.code}
-                        </TableCell>
-                        <TableCell className="px-4 py-4">
-                          {invoice.user}
-                        </TableCell>
-                        <TableCell className="px-4 py-4">
-                          {invoice.plan}
-                        </TableCell>
-                        <TableCell className="px-4 py-4">
-                          {invoice.method}
-                        </TableCell>
-                        <TableCell className="px-4 py-4 font-semibold">
-                          {formatCurrency(invoice.amount)}
-                        </TableCell>
-                        <TableCell className="px-4 py-4 text-muted-foreground">
-                          {formatDate(invoice.createdAt)}
-                        </TableCell>
-                        <TableCell className="px-6 py-4 text-right">
-                          <Badge className="bg-emerald-600 text-white">
-                            Đã thanh toán
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-
-                    {paginatedInvoices.length === 0 && (
-                      <TableRow>
-                        <TableCell
-                          colSpan={7}
-                          className="py-10 text-center text-muted-foreground"
-                        >
-                          Chưa có hóa đơn thanh toán thành công.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-
-              {filteredInvoices.length > 0 && (
-                <PaginationFooter
-                  page={invoicePage}
-                  pageSize={INVOICE_PAGE_SIZE}
-                  totalItems={filteredInvoices.length}
-                  totalPages={totalInvoicePages}
-                  onPageChange={setInvoicePage}
-                  label="hóa đơn"
-                />
+            <CardHeader>
+              <CardTitle className="text-base">Danh sách hóa đơn</CardTitle>
+              <CardDescription>
+                {loading ? 'Đang tải...' : `${invoices.length} hóa đơn trong khoảng lọc`}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {invoices.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-12 text-center">Không tìm thấy hóa đơn phù hợp.</p>
+              ) : (
+                <>
+                  <div className="overflow-x-auto rounded-xl border border-border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Mã HĐ</TableHead>
+                          <TableHead>User</TableHead>
+                          <TableHead>Gói</TableHead>
+                          <TableHead>Số tiền</TableHead>
+                          <TableHead>Tạo lúc</TableHead>
+                          <TableHead>Thanh toán</TableHead>
+                          <TableHead>Trạng thái</TableHead>
+                          <TableHead className="text-right">Chi tiết</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {paginatedInvoices.map((inv) => (
+                          <TableRow key={inv.id}>
+                            <TableCell className="font-semibold text-sm">{inv.code}</TableCell>
+                            <TableCell>
+                              <div>
+                                <p className="text-sm font-medium">{inv.userName}</p>
+                                <p className="text-[11px] text-muted-foreground">{inv.userEmail}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-sm">{inv.plan}</TableCell>
+                            <TableCell className="font-bold tabular-nums">{formatCurrency(inv.amount)}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{inv.createdAt}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{inv.paidAt}</TableCell>
+                            <TableCell>{invoiceStatusBadge(inv.status)}</TableCell>
+                            <TableCell className="text-right">
+                              <Button variant="ghost" size="sm" className="rounded-lg" onClick={() => setViewingInvoice(inv)}>
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <Pagination page={invoicePage} totalPages={totalInvoicePages} onChange={setInvoicePage} />
+                </>
               )}
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
-      <Dialog
-        open={Boolean(viewingPayment)}
-        onOpenChange={(open) => {
-          if (!open) setViewingPayment(null);
-        }}
-      >
-        <DialogContent className="max-h-[85vh] overflow-y-auto rounded-3xl border-border bg-background sm:max-w-[540px]">
-          <DialogHeader>
-            <DialogTitle>Chi tiết giao dịch</DialogTitle>
-            <DialogDescription>
-              {viewingPayment
-                ? getTransactionCode(viewingPayment)
-                : ''}
-            </DialogDescription>
-          </DialogHeader>
-
+      {/* Payment detail */}
+      <Sheet open={Boolean(viewingPayment)} onOpenChange={(open) => !open && setViewingPayment(null)}>
+        <SheetContent className="sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>Chi tiết giao dịch</SheetTitle>
+            <SheetDescription>{viewingPayment?.code}</SheetDescription>
+          </SheetHeader>
           {viewingPayment && (
-            <div className="space-y-3 text-sm">
-              <DetailRow
-                label="Người dùng"
-                value={
-                  viewingPayment.user?.fullName ||
-                  viewingPayment.user?.email ||
-                  '—'
-                }
-              />
-              <DetailRow
-                label="Email"
-                value={viewingPayment.user?.email || '—'}
-              />
-              <DetailRow
-                label="Gói"
-                value={viewingPayment.plan?.name || '—'}
-              />
-              <DetailRow
-                label="Phương thức"
-                value={viewingPayment.paymentMethod || '—'}
-              />
-              <DetailRow
-                label="Số tiền"
-                value={formatCurrency(viewingPayment.amount)}
-              />
-              <DetailRow
-                label="Nội dung chuyển khoản"
-                value={viewingPayment.orderInfo || '—'}
-                mono
-              />
-              <DetailRow
-                label="Ngày tạo"
-                value={formatDate(viewingPayment.createdAt)}
-              />
-              <DetailRow
-                label="Ngày thanh toán"
-                value={formatDate(viewingPayment.paidAt)}
-              />
-              <DetailRow
-                label="Mã phản hồi"
-                value={viewingPayment.responseCode || '—'}
-              />
-
-              <div className="flex items-center justify-between rounded-xl border border-border p-3">
+            <div className="mt-6 space-y-3 text-sm">
+              <Row label="User" value={`${viewingPayment.userName} (${viewingPayment.userEmail})`} />
+              <Row label="Gói" value={viewingPayment.plan} />
+              <Row label="Hóa đơn" value={viewingPayment.invoiceCode} />
+              <Row label="Phương thức" value={viewingPayment.method} />
+              <Row label="Số tiền" value={formatCurrency(viewingPayment.amount)} />
+              <Row label="Thời gian" value={viewingPayment.createdAt} />
+              <div className="flex justify-between gap-3 py-2 border-b border-border/60">
                 <span className="text-muted-foreground">Trạng thái</span>
-                <TransactionStatusBadge status={viewingPayment.status} />
+                {paymentStatusBadge(viewingPayment.status)}
+              </div>
+              {viewingPayment.description && <Row label="Mô tả" value={viewingPayment.description} />}
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* Invoice detail */}
+      <Sheet open={Boolean(viewingInvoice)} onOpenChange={(open) => !open && setViewingInvoice(null)}>
+        <SheetContent className="sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>Chi tiết hóa đơn</SheetTitle>
+            <SheetDescription>{viewingInvoice?.code}</SheetDescription>
+          </SheetHeader>
+          {viewingInvoice && (
+            <div className="mt-6 space-y-3 text-sm">
+              <Row label="Mã hóa đơn" value={viewingInvoice.code} />
+              <Row label="Mã giao dịch" value={viewingInvoice.txnRef} />
+              <Row label="User" value={`${viewingInvoice.userName} (${viewingInvoice.userEmail})`} />
+              <Row label="Gói" value={viewingInvoice.plan} />
+              <Row label="Phương thức" value={viewingInvoice.method} />
+              <Row label="Số tiền" value={formatCurrency(viewingInvoice.amount)} />
+              <Row label="Tạo lúc" value={viewingInvoice.createdAt} />
+              <Row label="Thanh toán" value={viewingInvoice.paidAt} />
+              <div className="flex justify-between gap-3 py-2 border-b border-border/60">
+                <span className="text-muted-foreground">Trạng thái</span>
+                {invoiceStatusBadge(viewingInvoice.status)}
               </div>
             </div>
           )}
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setViewingPayment(null)}
-            >
-              Đóng
-            </Button>
-
-            {viewingPayment?.status === 'WAITING_CONFIRMATION' && (
-              <Button
-                type="button"
-                disabled={approvingId === viewingPayment.id}
-                onClick={() => void handleApprove(viewingPayment)}
-                className="gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
-              >
-                {approvingId === viewingPayment.id ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="h-4 w-4" />
-                )}
-                Duyệt giao dịch
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
 
-function DetailRow({
-  label,
-  value,
-  mono = false,
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-}) {
+function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-start justify-between gap-4 rounded-xl border border-border p-3">
-      <span className="shrink-0 text-muted-foreground">{label}</span>
-      <span
-        className={`break-all text-right font-medium ${mono ? 'font-mono text-xs' : ''
-          }`}
-      >
-        {value}
-      </span>
-    </div>
-  );
-}
-
-function PaginationFooter({
-  page,
-  pageSize,
-  totalItems,
-  totalPages,
-  onPageChange,
-  label,
-}: {
-  page: number;
-  pageSize: number;
-  totalItems: number;
-  totalPages: number;
-  onPageChange: (page: number) => void;
-  label: string;
-}) {
-  return (
-    <div className="mt-4 flex flex-col gap-3 px-1 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-sm text-muted-foreground">
-        {(page - 1) * pageSize + 1}–
-        {Math.min(page * pageSize, totalItems)}/{totalItems} {label}
-      </p>
-
-      <div className="flex items-center gap-1">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-8 w-8 p-0"
-          disabled={page === 1}
-          onClick={() => onPageChange(Math.max(1, page - 1))}
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-
-        {Array.from({ length: totalPages }, (_, index) => index + 1)
-          .slice(Math.max(0, page - 3), Math.max(5, page + 2))
-          .map((pageNumber) => (
-            <Button
-              key={pageNumber}
-              type="button"
-              variant={pageNumber === page ? 'default' : 'outline'}
-              size="sm"
-              className="h-8 min-w-8 px-2 text-xs"
-              onClick={() => onPageChange(pageNumber)}
-            >
-              {pageNumber}
-            </Button>
-          ))}
-
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-8 w-8 p-0"
-          disabled={page === totalPages}
-          onClick={() =>
-            onPageChange(Math.min(totalPages, page + 1))
-          }
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-      </div>
+    <div className="flex justify-between gap-3 py-2 border-b border-border/60">
+      <span className="text-muted-foreground shrink-0">{label}</span>
+      <span className="font-medium text-right break-all">{value}</span>
     </div>
   );
 }

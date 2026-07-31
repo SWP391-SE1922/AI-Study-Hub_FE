@@ -4,6 +4,7 @@ import { CheckCircle2, XCircle, ArrowRight, ShieldCheck, HardDrive, RefreshCw } 
 import { Button } from '../components/ui/button';
 // @ts-ignore
 import confetti from 'canvas-confetti';
+import { motion } from 'motion/react';
 
 interface PaymentResultProps {
   status?: 'success' | 'failed';
@@ -81,7 +82,12 @@ export function PaymentResult({ status: propStatus }: PaymentResultProps) {
         .animate-ring-glow { animation: ring-glow 2s ease-in-out infinite; }
       `}</style>
 
-      <div className="relative bg-card border border-border rounded-3xl p-6 sm:p-10 shadow-xl overflow-hidden">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5 }}
+        className="relative bg-card border border-border rounded-3xl p-6 sm:p-10 shadow-xl overflow-hidden glassmorphism"
+      >
         {/* Decorative ambient background glow */}
         {isSuccess ? (
           <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl" />
@@ -204,7 +210,7 @@ export function PaymentResult({ status: propStatus }: PaymentResultProps) {
           </p>
 
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

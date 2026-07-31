@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, BookOpen, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Edit, Trash2, BookOpen, Calendar, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Card, CardContent } from '../../components/ui/card';
@@ -14,16 +14,11 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
-import { apiRequest } from '../../services/api';
+import { Badge } from '../../components/ui/badge';
+import { apiRequest, restoreSubject } from '../../services/api';
 import { toast } from 'sonner';
 
-const glowCard =
-  'border-sky-500/10 dark:border-sky-400/10 bg-white dark:bg-slate-900 ' +
-  'shadow-[0_0_0_1px_rgba(56,189,248,0.06),0_8px_30px_-8px_rgba(56,189,248,0.35)] ' +
-  'dark:shadow-[0_0_0_1px_rgba(56,189,248,0.08),0_8px_35px_-6px_rgba(56,189,248,0.25)] ' +
-  'hover:shadow-[0_0_0_1px_rgba(56,189,248,0.12),0_12px_45px_-8px_rgba(56,189,248,0.55)] ' +
-  'dark:hover:shadow-[0_0_0_1px_rgba(56,189,248,0.18),0_12px_45px_-8px_rgba(56,189,248,0.45)] ' +
-  'transition-shadow duration-300';
+const glowCard = 'bg-white rounded-3xl p-2 border border-[#121214]/5 shadow-sm transition-all duration-300 hover:shadow-md';
 
 function normalizeSearchText(value: string) {
   return value
@@ -39,6 +34,7 @@ interface Subject {
   name: string;
   code: string;
   description: string | null;
+  deletedAt?: string | null;
   createdAt: string;
 }
 
@@ -127,16 +123,26 @@ export function SubjectPage() {
   };
 
   const handleDelete = async (subjectId: string) => {
-    if (confirm('Bạn có chắc muốn xóa môn học này? Các tài liệu thuộc môn học sẽ chuyển thành không có môn học.')) {
+    if (confirm('Xóa mềm môn học này? Admin vẫn xem được và có thể khôi phục.')) {
       try {
         await apiRequest(`/subjects/${subjectId}`, {
           method: 'DELETE',
         });
-        toast.success('Đã xóa môn học thành công!');
-        setSubjects((prev) => prev.filter((s) => s.id !== subjectId));
+        toast.success('Đã xóa mềm môn học');
+        fetchSubjects();
       } catch (err: any) {
         toast.error(err.message || 'Lỗi khi xóa môn học.');
       }
+    }
+  };
+
+  const handleRestore = async (subjectId: string) => {
+    try {
+      await restoreSubject(subjectId);
+      toast.success('Đã khôi phục môn học');
+      fetchSubjects();
+    } catch (err: any) {
+      toast.error(err.message || 'Lỗi khi khôi phục môn học.');
     }
   };
 
@@ -149,10 +155,10 @@ export function SubjectPage() {
   const totalPages = Math.max(1, Math.ceil(filteredSubjects.length / PAGE_SIZE));
   const paginatedSubjects = filteredSubjects.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   return (
-    <div className="space-y-8 text-slate-900 dark:text-slate-100">
+    <div className="space-y-8 text-[#121214] selection:bg-[#121214] selection:text-white">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-gradient-to-br from-violet-500 via-indigo-500 to-fuchsia-500 rounded-xl flex items-center justify-center shadow-lg shadow-fuchsia-500/30">
+          <div className="w-12 h-12 bg-[#121214] rounded-xl flex items-center justify-center shadow-sm">
             <BookOpen className="w-6 h-6 text-white" />
           </div>
           <div>
@@ -160,7 +166,7 @@ export function SubjectPage() {
             <p className="text-muted-foreground mt-1">Danh sách các môn học.</p>
           </div>
         </div>
-        <Button onClick={openAddDialog} size="sm" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl">
+        <Button onClick={openAddDialog} size="sm" className="gap-2 bg-[#121214] hover:bg-stone-800 text-white rounded-xl">
           <Plus className="w-4 h-4" />
           Thêm môn học
         </Button>
@@ -191,6 +197,7 @@ export function SubjectPage() {
                   <TableHead className="py-4 px-6">Tên môn học</TableHead>
                   <TableHead className="py-4 px-4">Mã môn học</TableHead>
                   <TableHead className="py-4 px-4">Mô tả</TableHead>
+                  <TableHead className="py-4 px-4">Trạng thái</TableHead>
                   <TableHead className="py-4 px-4">Ngày tạo</TableHead>
                   <TableHead className="py-4 px-6 text-right">Thao tác</TableHead>
                 </TableRow>
@@ -198,20 +205,20 @@ export function SubjectPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
                       Đang tải danh sách môn học...
                     </TableCell>
                   </TableRow>
                 ) : filteredSubjects.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
                       Không tìm thấy môn học nào.
                     </TableCell>
                   </TableRow>
                 ) : (
                   paginatedSubjects.map((subject) => (
-                    <TableRow key={subject.id} className="hover:bg-muted/10 border-b border-border last:border-0 transition-colors">
-                      <TableCell className="py-4 px-6 font-semibold text-slate-900 dark:text-slate-100 text-sm">
+                    <TableRow key={subject.id} className={`hover:bg-muted/10 border-b border-border last:border-0 transition-colors ${subject.deletedAt ? 'opacity-60' : ''}`}>
+                      <TableCell className="py-4 px-6 font-semibold text-[#121214] text-sm">
                         {subject.name}
                       </TableCell>
                       <TableCell className="py-4 px-4 text-sm">
@@ -222,6 +229,13 @@ export function SubjectPage() {
                       <TableCell className="py-4 px-4 text-muted-foreground text-sm max-w-sm truncate">
                         {subject.description || 'Chưa có mô tả'}
                       </TableCell>
+                      <TableCell className="py-4 px-4">
+                        {subject.deletedAt ? (
+                          <Badge variant="destructive">Đã xóa</Badge>
+                        ) : (
+                          <Badge variant="secondary">Đang dùng</Badge>
+                        )}
+                      </TableCell>
                       <TableCell className="py-4 px-4 text-muted-foreground text-xs">
                         <div className="flex items-center gap-1.5">
                           <Calendar className="w-3.5 h-3.5" />
@@ -230,22 +244,36 @@ export function SubjectPage() {
                       </TableCell>
                       <TableCell className="py-4 px-6 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openEditDialog(subject)}
-                            className="h-8 w-8 rounded-full p-0 text-amber-600 hover:text-amber-700"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(subject.id)}
-                            className="h-8 w-8 rounded-full p-0 text-destructive hover:text-destructive/80"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          {subject.deletedAt ? (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleRestore(subject.id)}
+                              className="h-8 w-8 rounded-full p-0 text-emerald-600 hover:text-emerald-700"
+                              title="Khôi phục"
+                            >
+                              <RotateCcw className="w-4 h-4" />
+                            </Button>
+                          ) : (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => openEditDialog(subject)}
+                                className="h-8 w-8 rounded-full p-0 text-amber-600 hover:text-amber-700"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDelete(subject.id)}
+                                className="h-8 w-8 rounded-full p-0 text-destructive hover:text-destructive/80"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

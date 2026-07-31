@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useTheme } from 'next-themes';
 import {
   Sparkles,
@@ -20,92 +20,153 @@ import {
   FolderOpen,
   UploadCloud,
   Bot,
+  Terminal,
+  ChevronRight
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import { useGSAP } from '@gsap/react';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { Preloader } from '../components/Preloader';
+import Lottie from 'lottie-react';
+import documentAnimation from '../../animation/document.json';
+import botAnimation from '../../animation/Cute Bot Say Users Hello.json';
+import safeAnimation from '../../animation/Safe and secure.json';
+import cloudAnimation from '../../animation/Cloud Storage Icon Animation.json';
+import { Magnetic } from '../components/Magnetic';
+import { upgradeUserPlan, getToken, getActivePlans, createVnpayPaymentForPlan, subscribeFreePlan, type SubscriptionPlan } from '../services/api';
+import { toast } from 'sonner';
+import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '../components/ui/dropdown-menu';
 
-/* ----------------------------------------------------------------------
-   CONTENT — lấy đúng theo brief dự án (AI Study Hub)
----------------------------------------------------------------------- */
+import Lenis from 'lenis';
 
-const scatteredSources = [
-  { label: 'Google Drive', icon: HardDrive },
-  { label: 'Messenger', icon: MessageSquare },
-  { label: 'Facebook Group', icon: Users2 },
-  { label: 'Email', icon: Mail },
-  { label: 'USB cá nhân', icon: FileText },
-];
+gsap.registerPlugin(ScrollTrigger);
 
-const catalogModules = [
-  {
-    code: 'MỤC 01',
-    icon: KeyRound,
-    title: 'Authentication',
-    description: 'Đăng ký, đăng nhập, quên mật khẩu và cập nhật hồ sơ — một tài khoản cho toàn bộ tài liệu của bạn.',
-  },
-  {
-    code: 'MỤC 02',
-    icon: FolderOpen,
-    title: 'Document Management',
-    description: 'Upload, xem, tải xuống, chỉnh sửa, tìm kiếm và lọc tài liệu theo môn học chỉ trong vài giây.',
-  },
-  {
-    code: 'MỤC 03',
-    icon: UploadCloud,
-    title: 'Cloud Storage',
-    description: 'Tài liệu được đẩy lên cloud, theo dõi trạng thái upload và preview trực tiếp không cần tải về.',
-  },
-  {
-    code: 'MỤC 04',
-    icon: Bot,
-    title: 'AI Chatbot',
-    description: 'Hỏi đáp trực tiếp về nội dung tài liệu, nhận câu trả lời từ AI và xem lại lịch sử trò chuyện.',
-  },
-];
+function formatPlanPrice(price: number) {
+  if (!price || price <= 0) return '0đ';
+  return `${price.toLocaleString('vi-VN')}đ`;
+}
 
-const problems = [
-  'Tài liệu nằm rải rác ở Drive, Messenger, Email, USB cá nhân',
-  'Khó tìm lại tài liệu cũ, không có hệ thống phân loại rõ ràng',
-  'Không thể hỏi nhanh nội dung tài liệu khi cần gấp',
-  'Chia sẻ tài liệu giữa sinh viên còn thủ công, dung lượng máy hạn chế',
-];
-
-const outcomes = [
-  'Quản lý tài liệu học tập tập trung tại một nơi duy nhất',
-  'Giảm thất lạc, tăng khả năng tìm kiếm và truy cập tài liệu',
-  'Tạo môi trường chia sẻ tài liệu thuận tiện giữa sinh viên',
-  'Ứng dụng AI chatbot hỗ trợ giải đáp nội dung học tập 24/7',
-];
-
-const stats = [
-  { value: '10,000+', label: 'Sinh viên tin tưởng' },
-  { value: '50,000+', label: 'Tài liệu đã lưu trữ' },
-  { value: '100k+', label: 'Câu hỏi AI giải đáp' },
-  { value: '99.9%', label: 'Uptime hệ thống' },
-];
-
-/* ----------------------------------------------------------------------
-   COMPONENT
----------------------------------------------------------------------- */
+function formatStorage(bytes: number) {
+  const gb = bytes / (1024 * 1024 * 1024);
+  if (gb >= 900) return 'Vô hạn';
+  return `${Math.round(gb)} GB`;
+}
 
 export function LandingPage() {
+  const [showPreloader, setShowPreloader] = useState(() => {
+    return !sessionStorage.getItem('hasSeenIntro');
+  });
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [docCount, setDocCount] = useState(0);
+  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+  const [payingPlanId, setPayingPlanId] = useState<string | null>(null);
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
 
+  const userObj = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('user') || '{}');
+    } catch {
+      return {};
+    }
+  })();
+
+  const initials = (() => {
+    const source = userObj.fullName || userObj.email || 'SV';
+    const words = source.trim().split(/\s+/).filter(Boolean);
+    if (words.length >= 2) return `${words[0][0]}${words[words.length - 1][0]}`.toUpperCase();
+    return source.slice(0, 2).toUpperCase();
+  })();
+
+  const handleUpgrade = async (plan: SubscriptionPlan) => {
+    const token = getToken();
+    if (!token) {
+      toast.error('Vui lòng đăng nhập để nâng cấp gói cước!');
+      navigate('/login');
+      return;
+    }
+
+    try {
+      setPayingPlanId(plan.id);
+
+      // Gói miễn phí → đăng ký trực tiếp
+      if (!plan.price || plan.price <= 0) {
+        const data = await subscribeFreePlan(plan.id, plan.code);
+        if (data?.user) {
+          localStorage.setItem('user', JSON.stringify(data.user));
+          window.dispatchEvent(new Event('authChange'));
+        }
+        toast.success(`Đăng ký gói ${plan.name} thành công!`);
+        navigate('/profile');
+        return;
+      }
+
+      // Gói trả phí → tạo hóa đơn tạm + redirect VNPay
+      toast.message(`Đang tạo hóa đơn gói ${plan.name}...`);
+      const { paymentUrl, invoice } = await createVnpayPaymentForPlan(plan.id);
+      if (invoice) {
+        toast.message(`Hóa đơn ${invoice.invoiceCode}: ${Number(invoice.amount).toLocaleString('vi-VN')}₫`);
+      }
+      if (!paymentUrl) {
+        throw new Error('Không nhận được URL thanh toán VNPay.');
+      }
+      window.location.href = paymentUrl;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Lỗi khi nâng cấp gói.');
+    } finally {
+      setPayingPlanId(null);
+    }
+  };
+
+  const heroRef = useRef<HTMLDivElement>(null);
+  const featureSectionRef = useRef<HTMLDivElement>(null);
+
+  const [scrolled, setScrolled] = useState(false);
+
   useEffect(() => {
-    let frame: number;
-    const target = 48213;
-    const duration = 1800;
-    const start = performance.now();
-    const tick = (now: number) => {
-      const progress = Math.min((now - start) / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setDocCount(Math.floor(eased * target));
-      if (progress < 1) frame = requestAnimationFrame(tick);
+    setIsLoggedIn(Boolean(getToken()) || localStorage.getItem('isAuthenticated') === 'true');
+    setTheme('light');
+
+    getActivePlans()
+      .then(setPlans)
+      .catch(() => {
+        // fallback UI vẫn render nếu API lỗi
+      });
+
+    const lenis = new Lenis({
+      duration: 1.2,
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+    });
+
+    function raf(time: number) {
+      lenis.raf(time);
+      requestAnimationFrame(raf);
+    }
+
+    requestAnimationFrame(raf);
+
+    const handleScroll = () => {
+      if (window.scrollY > 40) {
+        setScrolled(true);
+      } else {
+        setScrolled(false);
+      }
     };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
+    window.addEventListener('scroll', handleScroll);
+
+    const syncAuth = () => {
+      setIsLoggedIn(Boolean(getToken()) || localStorage.getItem('isAuthenticated') === 'true');
+    };
+    window.addEventListener('authChange', syncAuth);
+    window.addEventListener('storage', syncAuth);
+
+    return () => {
+      lenis.destroy();
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('authChange', syncAuth);
+      window.removeEventListener('storage', syncAuth);
+    };
   }, []);
 
   const handleLogout = () => {
@@ -116,306 +177,463 @@ export function LandingPage() {
     navigate('/');
   };
 
-  const scrollToFeatures = () => {
-    document.getElementById('catalog')?.scrollIntoView({ behavior: 'smooth' });
-  };
+  useGSAP(() => {
+    if (showPreloader) return;
+
+    // Hero animations
+    gsap.fromTo(
+      '.hero-fade',
+      { opacity: 0, y: 30 },
+      { opacity: 1, y: 0, duration: 1.0, stagger: 0.15, ease: 'power3.out' }
+    );
+
+    // Feature slides reveal & Parallax images
+    if (featureSectionRef.current) {
+      const items = featureSectionRef.current.querySelectorAll('.feature-slide');
+      items.forEach((item) => {
+        gsap.fromTo(
+          item,
+          { opacity: 0, y: 50 },
+          {
+            opacity: 1,
+            y: 0,
+            duration: 0.8,
+            scrollTrigger: {
+              trigger: item,
+              start: 'top 85%',
+              toggleActions: 'play none none reverse',
+            },
+          }
+        );
+      });
+
+      const imgs = featureSectionRef.current.querySelectorAll('.parallax-img');
+      imgs.forEach((img) => {
+        gsap.fromTo(
+          img,
+          { yPercent: -12 },
+          {
+            yPercent: 12,
+            ease: 'none',
+            scrollTrigger: {
+              trigger: img.parentElement,
+              start: 'top bottom',
+              end: 'bottom top',
+              scrub: true,
+            },
+          }
+        );
+      });
+    }
+  }, [showPreloader]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground transition-colors duration-300 selection:bg-primary/30">
-      <style>{`
-        @keyframes converge-1 { 0% { transform: translate(-280px,-180px) rotate(-14deg); opacity:0; } 12% { opacity:1; } 55%,100% { transform: translate(0,0) rotate(0deg); opacity:0; } }
-        @keyframes converge-2 { 0% { transform: translate(290px,-140px) rotate(10deg); opacity:0; } 12% { opacity:1; } 55%,100% { transform: translate(0,0) rotate(0deg); opacity:0; } }
-        @keyframes converge-3 { 0% { transform: translate(-230px,200px) rotate(8deg); opacity:0; } 12% { opacity:1; } 55%,100% { transform: translate(0,0) rotate(0deg); opacity:0; } }
-        @keyframes converge-4 { 0% { transform: translate(260px,210px) rotate(-9deg); opacity:0; } 12% { opacity:1; } 55%,100% { transform: translate(0,0) rotate(0deg); opacity:0; } }
-        @keyframes converge-5 { 0% { transform: translate(0,-300px) rotate(3deg); opacity:0; } 12% { opacity:1; } 55%,100% { transform: translate(0,0) rotate(0deg); opacity:0; } }
-        .anim-c1 { animation: converge-1 5.5s ease-in-out infinite; }
-        .anim-c2 { animation: converge-2 5.5s ease-in-out infinite 1.1s; }
-        .anim-c3 { animation: converge-3 5.5s ease-in-out infinite 2.2s; }
-        .anim-c4 { animation: converge-4 5.5s ease-in-out infinite 3.3s; }
-        .anim-c5 { animation: converge-5 5.5s ease-in-out infinite 4.4s; }
-        @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(139,92,246,0.35); } 100% { box-shadow: 0 0 0 28px rgba(139,92,246,0); } }
-        .pulse-core { animation: pulse-ring 2.4s ease-out infinite; }
-        @keyframes drift { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
-        .drift { animation: drift 4s ease-in-out infinite; }
-        @media (prefers-reduced-motion: reduce) {
-          .anim-c1,.anim-c2,.anim-c3,.anim-c4,.anim-c5,.pulse-core,.drift { animation: none !important; }
-        }
-      `}</style>
-
-      {/* NAVBAR */}
-      <nav className="sticky top-0 z-50 bg-background/85 backdrop-blur-lg border-b border-border">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center">
-                <Sparkles className="w-4.5 h-4.5 text-white" />
-              </div>
-              <span className="text-lg font-bold tracking-tight">AI Study Hub</span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="w-9 h-9 text-muted-foreground hover:text-foreground rounded-xl"
-                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              >
-                <Sun className="w-4 h-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                <Moon className="absolute w-4 h-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-              </Button>
-
-              {isLoggedIn ? (
-                <Button variant="ghost" onClick={handleLogout} className="flex items-center gap-2">
-                  <LogOut className="w-4 h-4" /> Đăng xuất
-                </Button>
-              ) : (
-                <Link to="/login">
-                  <Button className="bg-gradient-to-r from-primary to-secondary text-white font-medium rounded-xl">
-                    Đăng nhập
-                  </Button>
-                </Link>
-              )}
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      {/* HERO — tài liệu rải rác hội tụ vào một kho duy nhất */}
-      <section className="relative overflow-hidden border-b border-border">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-secondary/5 to-background" />
-        <div
-          className="absolute inset-0 opacity-[0.04] dark:opacity-[0.06]"
-          style={{
-            backgroundImage:
-              'linear-gradient(currentColor 1px, transparent 1px), linear-gradient(90deg, currentColor 1px, transparent 1px)',
-            backgroundSize: '42px 42px',
+    <>
+      {showPreloader && (
+        <Preloader
+          onComplete={() => {
+            setShowPreloader(false);
+            sessionStorage.setItem('hasSeenIntro', 'true');
           }}
         />
-        <div className="container mx-auto px-4 py-20 md:py-28 relative grid lg:grid-cols-2 gap-16 items-center">
-          {/* Left: copy */}
-          <div className="space-y-7">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 border border-primary/30 bg-primary/5 rounded-full text-xs font-medium tracking-wide uppercase text-primary">
-              Hệ thống quản lý tài liệu học tập AI
+      )}
+
+      <div className="min-h-screen bg-[#f8f9fa] text-[#121214] font-sans selection:bg-[#121214] selection:text-white overflow-x-hidden relative">
+        {/* Fine Dotted Grid Background */}
+        <div className="absolute inset-0 pointer-events-none opacity-[0.4] dark:opacity-[0.1]"
+          style={{
+            backgroundImage: 'radial-gradient(#121214 1px, transparent 1px)',
+            backgroundSize: '24px 24px'
+          }}
+        />
+
+        {/* Soft colorful glow background behind hero */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[600px] pointer-events-none overflow-hidden z-0">
+          <div className="absolute -top-1/4 left-1/4 w-[600px] h-[400px] bg-gradient-to-r from-sky-300 via-indigo-200 to-rose-200 opacity-60 rounded-full blur-[100px]" />
+          <div className="absolute top-1/4 right-1/4 w-[400px] h-[300px] bg-orange-100 opacity-40 rounded-full blur-[80px]" />
+        </div>
+
+        {/* NAVBAR CONTAINER WITH FIXED POSITION */}
+        <div className="fixed top-0 left-0 right-0 z-50 flex justify-center p-4 transition-all duration-300">
+          <nav className={`w-full transition-all duration-500 flex items-center justify-between px-8 py-3 ${scrolled
+              ? 'max-w-5xl bg-white/80 backdrop-blur-xl border border-[#121214]/5 rounded-full shadow-lg'
+              : 'max-w-7xl bg-transparent border-b border-transparent'
+            }`}>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                className="text-sm font-extrabold tracking-widest text-[#121214] hover:opacity-70 transition-opacity"
+              >
+                AI STUDY HUB
+              </button>
             </div>
 
-            <h1 className="text-4xl md:text-[3.3rem] font-extrabold leading-[1.12] tracking-tight">
-              Tài liệu của bạn,
-              <br />
-              từ <span className="text-muted-foreground line-through decoration-2">rải rác</span>{' '}
-              đến{' '}
-              <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                một nơi duy nhất
-              </span>
+            {/* Middle routes / anchors */}
+            <div className="hidden md:flex items-center gap-8 text-[11px] font-mono uppercase tracking-widest text-[#121214]/70 dark:text-stone-300">
+              <button
+                onClick={() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' })}
+                className="hover:text-[#121214] dark:hover:text-white transition-colors"
+              >
+                Products
+              </button>
+              <button
+                onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
+                className="hover:text-[#121214] dark:hover:text-white transition-colors"
+              >
+                Pricing
+              </button>
+              <button
+                onClick={() => document.getElementById('about-us')?.scrollIntoView({ behavior: 'smooth' })}
+                className="hover:text-[#121214] dark:hover:text-white transition-colors"
+              >
+                About Us
+              </button>
+
+              {isLoggedIn && (
+                <>
+                  <Link to="/documents" className="hover:text-[#121214] dark:hover:text-white transition-colors">
+                    Tài liệu của tôi
+                  </Link>
+                  <Link to="/chat" className="hover:text-[#121214] dark:hover:text-white transition-colors">
+                    AI Chat
+                  </Link>
+                </>
+              )}
+            </div>
+
+            <div className="flex items-center gap-6">
+              {isLoggedIn ? (
+                <div className="flex items-center gap-2 pl-2 border-l border-zinc-200 dark:border-white/10">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="focus:outline-none">
+                        <Avatar className="w-8 h-8 border border-[#121214]/10 dark:border-white/10 hover:ring-2 hover:ring-indigo-500 transition-all cursor-pointer">
+                          <AvatarImage src={userObj.avatarUrl || ''} />
+                          <AvatarFallback className="bg-zinc-800 text-white text-[10px] font-bold">{initials}</AvatarFallback>
+                        </Avatar>
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-[#16141a] border border-zinc-200 dark:border-white/5 rounded-xl shadow-lg">
+                      <DropdownMenuItem onSelect={() => navigate('/profile')} className="text-xs font-semibold py-2 cursor-pointer">
+                        Hồ sơ
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => navigate('/transactions')} className="text-xs font-semibold py-2 cursor-pointer">
+                        Lịch sử giao dịch
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={handleLogout} className="text-xs font-semibold py-2 cursor-pointer text-rose-500 hover:text-rose-650">
+                        Đăng xuất
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              ) : (
+                <div className="flex items-center gap-4">
+                  <Link to="/login" className="text-xs font-bold uppercase tracking-wider text-[#121214]/70 dark:text-stone-400 hover:text-[#121214] dark:hover:text-white transition-colors">
+                    Login
+                  </Link>
+                  <Link to="/login">
+                    <Button className="bg-[#121214] dark:bg-white text-white dark:text-black hover:bg-stone-850 dark:hover:bg-stone-100 font-bold text-xs uppercase tracking-wider rounded-full px-6 py-2">
+                      Get Started
+                    </Button>
+                  </Link>
+                </div>
+              )}
+            </div>
+          </nav>
+        </div>
+
+        {/* HERO SECTION */}
+        <section ref={heroRef} className="min-h-[85vh] flex flex-col justify-center items-center text-center px-6 pt-32 pb-16 relative z-10">
+          <div className="max-w-4xl space-y-8">
+            <h1 className="hero-fade text-4xl md:text-6xl font-extrabold tracking-tight text-[#121214] leading-[1.1] max-w-3xl mx-auto">
+              Accelerate every stage of your document learning
             </h1>
 
-            <p className="text-base md:text-lg text-muted-foreground max-w-xl leading-relaxed">
-              Drive, Messenger, Facebook Group, Email, USB — gom hết về AI Study Hub.
-              Lưu trữ trên cloud, tìm kiếm tức thì và hỏi đáp trực tiếp với AI ngay trên tài liệu của bạn.
+            <p className="hero-fade text-sm md:text-base text-stone-500 max-w-xl mx-auto leading-relaxed">
+              Organize, retrieve, and chat with your files using AI. Built for modern students and developers.
             </p>
 
-            <div className="flex flex-wrap items-center gap-3 pt-2">
+            <div className="hero-fade flex items-center justify-center gap-4 pt-2">
               <Link to="/login">
-                <Button className="bg-gradient-to-r from-primary to-secondary text-white font-medium rounded-xl px-6 h-11 group">
-                  Bắt đầu lưu trữ
-                  <ArrowRight className="w-4 h-4 ml-1.5 transition-transform group-hover:translate-x-1" />
+                <Button className="bg-[#121214] text-white hover:bg-stone-800 font-bold text-xs uppercase tracking-wider rounded-full px-8 py-3.5 h-auto">
+                  Get Started
                 </Button>
               </Link>
-              <Button
-                variant="outline"
-                onClick={scrollToFeatures}
-                className="border-border rounded-xl px-6 h-11 bg-transparent hover:bg-muted"
+              <button
+                onClick={() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' })}
+                className="bg-white border border-[#121214]/10 text-[#121214] hover:bg-stone-50 font-bold text-xs uppercase tracking-wider rounded-full px-8 py-3.5 h-auto shadow-sm transition-all"
               >
-                Xem mục lục tính năng
-              </Button>
-            </div>
-
-            <div className="flex items-center gap-2 pt-4 text-sm text-muted-foreground">
-              <span className="font-semibold text-primary tabular-nums">{docCount.toLocaleString('vi-VN')}</span>
-              <span>tài liệu đang được lưu trữ ngay lúc này</span>
+                Explore Products
+              </button>
             </div>
           </div>
 
-          {/* Right: convergence animation */}
-          <div className="relative h-[560px] flex items-center justify-center">
-            <div className="relative w-[420px] h-[420px] flex items-center justify-center">
-              {/* center hub */}
-              <div className="pulse-core drift relative z-10 w-40 h-40 rounded-3xl bg-gradient-to-br from-primary to-secondary flex flex-col items-center justify-center shadow-2xl">
-                <Cloud className="w-11 h-11 text-white" />
-                <span className="text-xs font-bold text-white mt-2 tracking-wide">
-                  STUDY HUB
-                </span>
+          {/* Trusted Client banner */}
+          <div className="hero-fade w-full max-w-5xl mt-24 space-y-6">
+            <p className="text-[10px] font-mono tracking-widest text-stone-400 uppercase">Trusted by 3,000+ professionals worldwide</p>
+            <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-6 opacity-30 select-none">
+              <span className="font-extrabold tracking-widest text-sm uppercase">Somewhere.</span>
+              <span className="font-extrabold tracking-widest text-sm uppercase">brick</span>
+              <span className="font-extrabold tracking-widest text-sm uppercase">VMI</span>
+              <span className="font-extrabold tracking-widest text-sm uppercase">AECOM</span>
+              <span className="font-extrabold tracking-widest text-sm uppercase">Gensler</span>
+              <span className="font-extrabold tracking-widest text-sm uppercase">DBOX</span>
+            </div>
+          </div>
+        </section>
+
+        {/* PRODUCTS / FEATURE SHOWCASE */}
+        <section id="products" ref={featureSectionRef} className="py-24 border-t border-[#121214]/[0.03] bg-white relative z-10">
+          <div className="max-w-6xl mx-auto px-6">
+            <div className="text-center mb-20 space-y-4">
+              <div className="inline-flex gap-2.5 items-center justify-center">
+                <span className="w-6 h-6 rounded bg-sky-100 flex items-center justify-center text-xs">⚡</span>
+                <span className="w-6 h-6 rounded bg-violet-100 flex items-center justify-center text-xs">🅡</span>
+                <span className="w-6 h-6 rounded bg-orange-100 flex items-center justify-center text-xs">🅓</span>
+              </div>
+              <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-[#121214]">Meet the products</h2>
+              <p className="text-xs text-stone-400">Pick the tool that fits your needs.</p>
+            </div>
+
+            <div className="space-y-36">
+              {/* Product 1: Quản lý tài liệu đơn giản */}
+              <div className="feature-slide grid md:grid-cols-2 gap-12 items-center">
+                <div className="space-y-6">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-orange-50 text-orange-600 rounded-full text-xs font-bold font-mono uppercase tracking-wider">
+                    [ Document Management ]
+                  </div>
+                  <h3 className="text-2xl md:text-3xl font-extrabold text-[#121214] leading-tight">Quản lý tài liệu tối giản & hiệu quả</h3>
+                  <p className="text-stone-500 text-sm leading-relaxed">
+                    Đăng tải, tổ chức và truy xuất mọi loại tài liệu học tập của bạn ở cùng một nơi. Giao diện trực quan giúp bạn tiết kiệm hàng giờ tìm kiếm và sắp xếp thủ công.
+                  </p>
+                  <Button className="bg-[#121214] hover:bg-stone-800 text-white font-bold text-xs uppercase tracking-wider rounded-full px-6 py-2.5">
+                    Khám phá Kho tài liệu
+                  </Button>
+                </div>
+                <div className="relative rounded-2xl overflow-hidden border border-stone-200/60 shadow-xl bg-[#f8f9fa] h-80 flex items-center justify-center p-8">
+                  <Lottie animationData={documentAnimation} loop={true} autoplay={true} className="w-full h-full max-w-sm" />
+                </div>
               </div>
 
-              {/* scattered source chips converging */}
-              {scatteredSources.map((src, i) => {
-                const Icon = src.icon;
-                const animClass = `anim-c${i + 1}`;
+              {/* Product 2: Chat với AI về tài liệu của bạn */}
+              <div className="feature-slide grid md:grid-cols-2 gap-12 items-center">
+                <div className="relative rounded-2xl overflow-hidden border border-stone-200/60 shadow-xl bg-[#f8f9fa] h-80 flex items-center justify-center p-8">
+                  <Lottie animationData={botAnimation} loop={true} autoplay={true} className="w-full h-full max-w-sm" />
+                </div>
+                <div className="space-y-6">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-violet-50 text-violet-600 rounded-full text-xs font-bold font-mono uppercase tracking-wider">
+                    [ AI Chat Companion ]
+                  </div>
+                  <h3 className="text-2xl md:text-3xl font-extrabold text-[#121214] leading-tight">Trò chuyện về tài liệu với AI</h3>
+                  <p className="text-stone-500 text-sm leading-relaxed">
+                    Hỏi đáp thông minh, tóm tắt chương sách, hoặc tra cứu nhanh công thức trực tiếp từ file tài liệu của bạn. Trợ lý AI đồng hành hỗ trợ phân tích tài liệu 24/7.
+                  </p>
+                  <Button className="bg-violet-600 text-white hover:bg-violet-700 font-bold text-xs uppercase tracking-wider rounded-full px-6 py-2.5">
+                    Trò chuyện ngay
+                  </Button>
+                </div>
+              </div>
+
+              {/* Product 3: Tài liệu được bảo mật */}
+              <div className="feature-slide grid md:grid-cols-2 gap-12 items-center">
+                <div className="space-y-6">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-xs font-bold font-mono uppercase tracking-wider">
+                    [ Secure Vault ]
+                  </div>
+                  <h3 className="text-2xl md:text-3xl font-extrabold text-[#121214] leading-tight">Bảo mật dữ liệu học tập tuyệt đối</h3>
+                  <p className="text-stone-500 text-sm leading-relaxed">
+                    Tài liệu cá nhân và nghiên cứu của bạn được mã hóa an toàn và bảo vệ quyền riêng tư tuyệt đối trên đám mây. Bạn hoàn toàn làm chủ và kiểm soát dữ liệu học tập của mình.
+                  </p>
+                  <Button className="bg-emerald-600 text-white hover:bg-emerald-700 font-bold text-xs uppercase tracking-wider rounded-full px-6 py-2.5">
+                    Xem chính sách Bảo mật
+                  </Button>
+                </div>
+                <div className="relative rounded-2xl overflow-hidden border border-stone-200/60 shadow-xl bg-[#f8f9fa] h-80 flex items-center justify-center p-8">
+                  <Lottie animationData={safeAnimation} loop={true} autoplay={true} className="w-full h-full max-w-sm" />
+                </div>
+              </div>
+
+              {/* Product 4: Dung lượng lưu trữ đám mây */}
+              <div className="feature-slide grid md:grid-cols-2 gap-12 items-center">
+                <div className="relative rounded-2xl overflow-hidden border border-stone-200/60 shadow-xl bg-[#f8f9fa] h-80 flex items-center justify-center p-8">
+                  <Lottie animationData={cloudAnimation} loop={true} autoplay={true} className="w-full h-full max-w-sm" />
+                </div>
+                <div className="space-y-6">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-sky-50 text-sky-600 rounded-full text-xs font-bold font-mono uppercase tracking-wider">
+                    [ Cloud Capacity ]
+                  </div>
+                  <h3 className="text-2xl md:text-3xl font-extrabold text-[#121214] leading-tight">Không gian lưu trữ không giới hạn</h3>
+                  <p className="text-stone-500 text-sm leading-relaxed">
+                    Gom toàn bộ giáo trình, slide bài giảng, bài tập lớn và tài liệu ôn tập của các học kỳ vào một kho lưu trữ đám mây tốc độ cao. Truy cập và học tập mọi lúc mọi nơi.
+                  </p>
+                  <Button className="bg-sky-600 text-white hover:bg-sky-700 font-bold text-xs uppercase tracking-wider rounded-full px-6 py-2.5">
+                    Nâng cấp Dung lượng
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* PRICING SECTION */}
+        <section id="pricing" className="py-24 border-t border-[#121214]/[0.03] bg-[#f8f9fa] relative z-10">
+          <div className="max-w-6xl mx-auto px-6">
+            <div className="text-center mb-16 space-y-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-bold font-mono uppercase tracking-wider">
+                [ Simple Plans ]
+              </div>
+              <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-[#121214]">Pricing Plans</h2>
+              <p className="text-xs text-stone-400">Choose the best fit for your study scale.</p>
+            </div>
+
+            <div className="grid md:grid-cols-4 gap-6">
+              {(plans.length
+                ? plans
+                : [
+                  {
+                    id: 'fallback-basic',
+                    code: 'BASIC',
+                    name: 'BASIC (FREE)',
+                    price: 0,
+                    storageLimit: 5 * 1024 * 1024 * 1024,
+                    aiQuestionsLimit: 20,
+                    aiModel: 'llama3',
+                    durationDays: 0,
+                    features: ['5 GB dung lượng lưu trữ', '20 lượt hỏi AI', 'Mô hình Llama3 tiêu chuẩn'],
+                    isActive: true,
+                    sortOrder: 1,
+                  },
+                  {
+                    id: 'fallback-premium',
+                    code: 'PREMIUM',
+                    name: 'PREMIUM',
+                    price: 250000,
+                    storageLimit: 10 * 1024 * 1024 * 1024,
+                    aiQuestionsLimit: 50,
+                    aiModel: 'mistral',
+                    durationDays: 30,
+                    features: ['10 GB dung lượng lưu trữ', '50 lượt hỏi AI', 'Ưu tiên xử lý nhanh'],
+                    isActive: true,
+                    sortOrder: 2,
+                  },
+                  {
+                    id: 'fallback-vip',
+                    code: 'VIP',
+                    name: 'VIP',
+                    price: 500000,
+                    storageLimit: 50 * 1024 * 1024 * 1024,
+                    aiQuestionsLimit: 250,
+                    aiModel: 'qwen2.5',
+                    durationDays: 30,
+                    features: ['50 GB dung lượng lưu trữ', '250 lượt hỏi AI', 'Hỗ trợ ưu tiên 24/7'],
+                    isActive: true,
+                    sortOrder: 3,
+                  },
+                  {
+                    id: 'fallback-unlimited',
+                    code: 'UNLIMITED',
+                    name: 'UNLIMITED',
+                    price: 1200000,
+                    storageLimit: 999 * 1024 * 1024 * 1024,
+                    aiQuestionsLimit: 999999,
+                    aiModel: 'qwen2.5',
+                    durationDays: 30,
+                    features: ['Vô hạn dung lượng', 'Không giới hạn lượt hỏi AI', 'Trải nghiệm thoải mái nhất'],
+                    isActive: true,
+                    sortOrder: 4,
+                  },
+                ] as SubscriptionPlan[]
+              ).map((plan) => {
+                const isPopular = plan.code === 'VIP';
+                const isUnlimited = plan.code === 'UNLIMITED';
+                const isFree = !plan.price || plan.price <= 0;
+                const accent =
+                  plan.code === 'PREMIUM'
+                    ? 'text-indigo-600'
+                    : plan.code === 'VIP'
+                      ? 'text-indigo-600'
+                      : plan.code === 'UNLIMITED'
+                        ? 'text-fuchsia-600'
+                        : 'text-stone-400';
+
                 return (
                   <div
-                    key={src.label}
-                    className={`absolute z-0 ${animClass} flex items-center gap-2 px-4 py-2.5 rounded-xl bg-card border border-border shadow-md text-sm font-medium whitespace-nowrap text-foreground`}
+                    key={plan.id}
+                    className={`bg-white rounded-3xl p-6 flex flex-col justify-between shadow-sm relative ${isPopular ? 'border-2 border-indigo-600/20 shadow-md' : 'border border-[#121214]/5'
+                      }`}
                   >
-                    <Icon className="w-4 h-4 text-primary flex-shrink-0" />
-                    {src.label}
+                    {isPopular && (
+                      <div className="absolute -top-3 right-4 px-2 py-0.5 bg-indigo-600 text-white rounded-full text-[8px] font-extrabold uppercase tracking-widest font-mono">
+                        POPULAR
+                      </div>
+                    )}
+                    <div className="space-y-4">
+                      <span className={`text-[10px] font-bold uppercase tracking-widest font-mono ${accent}`}>
+                        {plan.name}
+                      </span>
+                      <div className="text-2xl font-extrabold">
+                        {formatPlanPrice(plan.price)}{' '}
+                        <span className="text-xs font-normal text-stone-400">/mo</span>
+                      </div>
+                      <ul className="text-stone-500 text-xs space-y-2 leading-relaxed">
+                        {(plan.features?.length
+                          ? plan.features
+                          : [
+                            `${formatStorage(plan.storageLimit)} dung lượng lưu trữ`,
+                            `${plan.aiQuestionsLimit >= 999999 ? 'Không giới hạn' : plan.aiQuestionsLimit} lượt hỏi AI`,
+                            `Mô hình ${plan.aiModel}`,
+                          ]
+                        ).map((feature) => (
+                          <li key={feature}>• {feature}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <Button
+                      disabled={payingPlanId === plan.id || plan.id.startsWith('fallback-')}
+                      onClick={() => handleUpgrade(plan)}
+                      className={`w-full rounded-full py-2 mt-6 font-bold text-xs ${isUnlimited
+                          ? 'bg-gradient-to-r from-indigo-500 to-fuchsia-500 text-white hover:opacity-90'
+                          : isPopular
+                            ? 'bg-[#121214] text-white hover:bg-stone-800 uppercase tracking-wider'
+                            : plan.code === 'PREMIUM'
+                              ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                              : 'bg-white border border-[#121214]/10 text-[#121214] hover:bg-stone-50'
+                        }`}
+                    >
+                      {payingPlanId === plan.id
+                        ? 'Đang xử lý...'
+                        : isFree
+                          ? 'Đăng ký miễn phí'
+                          : `Thanh toán ${formatPlanPrice(plan.price)}`}
+                    </Button>
                   </div>
                 );
               })}
             </div>
           </div>
-        </div>
+        </section>
 
-        <div className="container mx-auto px-4 pb-16 relative">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 pt-10 border-t border-border/60">
-            {stats.map((stat) => (
-              <div key={stat.label}>
-                <h3 className="text-2xl md:text-3xl font-extrabold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                  {stat.value}
-                </h3>
-                <p className="text-xs text-muted-foreground mt-1 font-medium">{stat.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* PROBLEM -> OUTCOME */}
-      <section className="py-20 border-b border-border">
-        <div className="container mx-auto px-4 grid lg:grid-cols-2 gap-10">
-          <div className="bg-card border border-border rounded-2xl p-8">
-            <span className="text-xs font-semibold tracking-widest uppercase text-muted-foreground">
-              Trước AI Study Hub
-            </span>
-            <h3 className="text-2xl font-bold mt-2 mb-6">
-              Việc học gián đoạn vì tài liệu thất lạc
-            </h3>
-            <ul className="space-y-4">
-              {problems.map((p) => (
-                <li key={p} className="flex items-start gap-3 text-sm text-muted-foreground">
-                  <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-muted-foreground flex-shrink-0" />
-                  {p}
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="bg-gradient-to-br from-primary/10 to-secondary/5 border border-primary/30 rounded-2xl p-8">
-            <span className="text-xs font-semibold tracking-widest uppercase text-primary">
-              Với AI Study Hub
-            </span>
-            <h3 className="text-2xl font-bold mt-2 mb-6">
-              Một hệ thống, mọi tài liệu, mọi câu hỏi
-            </h3>
-            <ul className="space-y-4">
-              {outcomes.map((o) => (
-                <li key={o} className="flex items-start gap-3 text-sm text-foreground">
-                  <Sparkles className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
-                  {o}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      {/* CATALOG / FEATURES — đánh số theo đúng 4 module thật của hệ thống */}
-      <section id="catalog" className="py-20 border-b border-border bg-muted/30">
-        <div className="container mx-auto px-4">
-          <div className="mb-14 max-w-2xl">
-            <span className="text-xs font-semibold tracking-widest uppercase text-primary">
-              Mục lục hệ thống
-            </span>
-            <h2 className="text-3xl md:text-4xl font-bold mt-2">
-              4 module dựng nên AI Study Hub
-            </h2>
-            <p className="text-muted-foreground mt-3 text-base">
-              Từ đăng nhập đến hỏi đáp AI — mỗi module được thiết kế để giải quyết một bước trong hành trình quản lý tài liệu của bạn.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-px bg-border rounded-2xl overflow-hidden border border-border">
-            {catalogModules.map((m) => {
-              const Icon = m.icon;
-              return (
-                <div key={m.code} className="bg-card p-8 hover:bg-muted/50 transition-colors group">
-                  <div className="flex items-center justify-between mb-6">
-                    <span className="text-xs font-semibold text-muted-foreground tracking-widest">
-                      {m.code}
-                    </span>
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                      <Icon className="w-5 h-5 text-primary" />
-                    </div>
-                  </div>
-                  <h3 className="text-xl font-semibold mb-2">{m.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{m.description}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* SUPPORTING FEATURES STRIP */}
-      <section className="py-16 border-b border-border">
-        <div className="container mx-auto px-4 grid sm:grid-cols-3 gap-6">
-          {[
-            { icon: Search, title: 'Tìm kiếm thông minh', desc: 'Lọc tài liệu theo môn học, tìm ra thứ cần trong vài giây.' },
-            { icon: MessageSquare, title: 'AI hỏi đáp 24/7', desc: 'Hỏi trực tiếp nội dung tài liệu, không cần đọc lại từ đầu.' },
-            { icon: Shield, title: 'Bảo mật & bản quyền', desc: 'Dữ liệu mã hóa, tôn trọng quyền sở hữu tài liệu cá nhân.' },
-          ].map((f) => {
-            const Icon = f.icon;
-            return (
-              <div key={f.title} className="flex gap-4">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
-                  <Icon className="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-sm mb-1">{f.title}</h4>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{f.desc}</p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="py-20 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-secondary/5 to-transparent" />
-        <div className="container mx-auto px-4 relative">
-          <div className="max-w-2xl mx-auto text-center space-y-6">
-            <BookOpen className="w-9 h-9 text-primary mx-auto" />
-            <h2 className="text-3xl md:text-4xl font-bold">
-              Sẵn sàng gom tài liệu về một nơi?
-            </h2>
-            <p className="text-muted-foreground">
-              Tham gia cùng hàng ngàn sinh viên đang dùng AI Study Hub để học tập hiệu quả hơn mỗi ngày.
-            </p>
-            <Link to="/login">
-              <Button className="bg-gradient-to-r from-primary to-secondary text-white font-medium rounded-xl px-7 h-11">
-                Tạo tài khoản miễn phí
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* FOOTER */}
-      <footer className="py-10 border-t border-border bg-card">
-        <div className="container mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center">
-              <Sparkles className="w-3.5 h-3.5 text-white" />
+        {/* ABOUT US SECTION */}
+        <section id="about-us" className="py-24 border-t border-[#121214]/[0.03] bg-white relative z-10">
+          <div className="max-w-4xl mx-auto px-6 text-center space-y-8">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-stone-100 text-stone-700 rounded-full text-[10px] font-bold font-mono uppercase tracking-wider">
+              [ Our Vision ]
             </div>
-            <span className="font-semibold text-sm">AI Study Hub</span>
+            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-[#121214]">About AI Study Hub</h2>
+            <p className="text-stone-500 text-sm max-w-xl mx-auto leading-relaxed">
+              We build intelligent educational hubs that allow developers, students, and research teams to upload text modules and query them seamlessly using advanced Large Language Models. Our mission is to accelerate the learning lifecycle.
+            </p>
           </div>
-          <p className="text-xs text-muted-foreground">© 2024 AI Study Hub. All rights reserved.</p>
-          <div className="flex items-center gap-6 text-xs text-muted-foreground">
-            <a href="#" className="hover:text-primary transition-colors">Privacy</a>
-            <a href="#" className="hover:text-primary transition-colors">Terms</a>
-            <a href="#" className="hover:text-primary transition-colors">Contact</a>
+        </section>
+
+        {/* FOOTER */}
+        <footer className="py-12 border-t border-[#121214]/[0.03] bg-[#f8f9fa]">
+          <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6 text-stone-500">
+            <span className="font-extrabold text-xs uppercase tracking-widest text-[#121214]">AI STUDY HUB</span>
+            <p className="text-[10px] font-mono">© 2026 AI Study Hub. All rights reserved.</p>
           </div>
-        </div>
-      </footer>
-    </div>
+        </footer>
+      </div>
+    </>
   );
 }
