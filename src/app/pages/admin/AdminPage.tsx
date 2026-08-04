@@ -36,6 +36,8 @@ import {
   restoreUser,
   deleteDocument,
   restoreDocument,
+  getPublicSettings,
+  updateSystemSettings,
   type DocumentItem,
   type DocumentVersionItem,
   type User,
@@ -212,6 +214,8 @@ export function AdminPage() {
   const [versionDocument, setVersionDocument] = useState<DocumentItem | null>(null);
   const [versions, setVersions] = useState<DocumentVersionItem[]>([]);
   const [versionLoading, setVersionLoading] = useState(false);
+  const [systemMaxUploadSize, setSystemMaxUploadSize] = useState(10); // in MB
+  const [savingSettings, setSavingSettings] = useState(false);
   const [userSearch, setUserSearch] = useState('');
   const [userRoleFilter, setUserRoleFilter] = useState('');
   const [userVerifiedFilter, setUserVerifiedFilter] = useState('');
@@ -265,6 +269,15 @@ const pageMode = location.pathname.includes('/admin/users')
       nextCurrentUser = await getMe();
     } catch {
       nextCurrentUser = null;
+    }
+
+    try {
+      const settings = await getPublicSettings();
+      if (settings && settings.maxUploadSize) {
+        setSystemMaxUploadSize(Math.round(settings.maxUploadSize / (1024 * 1024)));
+      }
+    } catch (error) {
+      console.warn('Lỗi lấy setting:', error);
     }
 
     setUsers(nextUsers);
@@ -545,6 +558,18 @@ const pageMode = location.pathname.includes('/admin/users')
     }
   };
 
+  const handleSaveSettings = async () => {
+    setSavingSettings(true);
+    try {
+      await updateSystemSettings(systemMaxUploadSize * 1024 * 1024);
+      toast.success('Đã lưu cấu hình hệ thống');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Không thể lưu cấu hình');
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
   const renderPageTitle = () => {
     if (pageMode === 'users') {
       return {
@@ -615,8 +640,39 @@ const pageMode = location.pathname.includes('/admin/users')
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            {/* Cột trái: 2 chart xếp dọc, chiếm 2/3 */}
+            {/* Cột trái: 2 chart + settings xếp dọc, chiếm 2/3 */}
             <div className="xl:col-span-2 flex flex-col gap-6">
+              <Card className={glowCard}>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <span className="w-9 h-9 rounded-lg bg-sky-50 dark:bg-sky-500/10 flex items-center justify-center">
+                      <HardDrive className="w-5 h-5 text-sky-500" />
+                    </span>
+                    <CardTitle>Cấu hình hệ thống</CardTitle>
+                  </div>
+                  <CardDescription>
+                    Thay đổi các giới hạn của hệ thống áp dụng cho toàn bộ người dùng.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-end gap-4 max-w-sm">
+                    <div className="flex-1">
+                      <label className="text-sm font-semibold mb-1.5 block">Dung lượng tải lên tối đa (MB)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={systemMaxUploadSize}
+                        onChange={(e) => setSystemMaxUploadSize(Number(e.target.value))}
+                        className="w-full bg-card border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-sky-500"
+                      />
+                    </div>
+                    <Button onClick={handleSaveSettings} disabled={savingSettings} className="bg-sky-500 hover:bg-sky-600 text-white rounded-xl">
+                      {savingSettings ? 'Đang lưu...' : 'Lưu lại'}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
               <Card className={glowCard}>
                 <CardHeader>
                   <div className="flex items-center gap-2">

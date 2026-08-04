@@ -29,6 +29,7 @@ import {
   getResources,
   createFolder,
   deleteFolder,
+  getPublicSettings,
   type FolderItem,
   type CategoryItem,
   type DocumentItem,
@@ -151,6 +152,7 @@ export function DocumentsPage() {
   const [categoryId, setCategoryId] = useState('');
   // uploadSubject: tên môn học do người dùng tự điền (giúp AI dễ tìm và phân loại)
   const [uploadSubject, setUploadSubject] = useState('');
+  const [maxUploadSize, setMaxUploadSize] = useState(10485760); // 10MB default
 
   // Edit states
   const [editingDocument, setEditingDocument] = useState<DocumentWithImage | null>(null);
@@ -221,6 +223,26 @@ export function DocumentsPage() {
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
     if (!selectedFile) return;
+
+    // Validation định dạng
+    const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    const fileExt = selectedFile.name.split('.').pop()?.toLowerCase();
+    const isDocx = fileExt === 'docx';
+    const isPdf = fileExt === 'pdf';
+
+    if (!allowedTypes.includes(selectedFile.type) && !isDocx && !isPdf) {
+      toast.error('Định dạng không được hỗ trợ. Vui lòng chỉ chọn file .pdf hoặc .docx');
+      event.target.value = '';
+      return;
+    }
+
+    // Validation dung lượng
+    if (selectedFile.size > maxUploadSize) {
+      toast.error(`File vượt quá giới hạn ${(maxUploadSize / (1024*1024)).toFixed(1)}MB. Vui lòng chọn file nhẹ hơn.`);
+      event.target.value = '';
+      return;
+    }
+
     setFile(selectedFile);
     if (!title.trim()) setTitle(selectedFile.name.replace(/\.[^/.]+$/, ''));
   };
@@ -380,9 +402,19 @@ export function DocumentsPage() {
     }
   };
 
-  const handleUploadOpenChange = (open: boolean) => {
+  const handleUploadOpenChange = async (open: boolean) => {
     setIsUploadOpen(open);
     if (!open && !uploadLoading) resetUploadForm();
+    if (open) {
+      try {
+        const settings = await getPublicSettings();
+        if (settings && settings.maxUploadSize) {
+          setMaxUploadSize(settings.maxUploadSize);
+        }
+      } catch (err) {
+        console.error('Lỗi khi lấy maxUploadSize:', err);
+      }
+    }
   };
 
   return (
@@ -710,6 +742,7 @@ export function DocumentsPage() {
               <Input
                 id="file"
                 type="file"
+                accept=".pdf,.docx"
                 onChange={handleFileChange}
                 required
                 className="rounded-xl border-slate-200 dark:border-slate-800 file:mr-4 file:py-1 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 file:dark:bg-slate-800 file:dark:text-cyan-300"

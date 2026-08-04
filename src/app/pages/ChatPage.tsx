@@ -10,7 +10,7 @@ import {
   deleteChatSession,
   getChatMessages,
   getChatSessions,
-  sendChatMessage,
+  streamChatMessage,
   getDocuments,
   getResources,
   type ChatMessage,
@@ -86,7 +86,7 @@ export function ChatPage() {
         );
       }
     }
-  }, [messages]);
+  }, [messages.length]);
 
   const loadSessions = async () => {
     try {
@@ -214,21 +214,45 @@ export function ChatPage() {
       content: message,
       createdAt: new Date().toISOString(),
     };
-    setMessages((current) => [...current, tempUserMessage]);
+
+    const tempAiMessage: ChatMessage = {
+      id: `temp-ai-${Date.now()}`,
+      sessionId: activeSessionId || 'new',
+      role: 'assistant',
+      content: '',
+      createdAt: new Date().toISOString(),
+    };
+
+    setMessages((current) => [...current, tempUserMessage, tempAiMessage]);
 
     try {
       const folderContext = await buildFolderContext();
       const promptToSend = folderContext ? `${folderContext}Câu hỏi của người dùng: ${message}` : message;
 
-      const result = await sendChatMessage(promptToSend, activeSessionId);
-      setActiveSessionId(result.session.id);
-      setMessages((current) => [
-        ...current.filter((item) => item.id !== tempUserMessage.id),
-        ...result.messages,
-      ]);
-      await loadSessions();
+      const result = await streamChatMessage(promptToSend, activeSessionId, (chunk) => {
+        setMessages((current) => {
+          const newMessages = [...current];
+          const aiMsgIndex = newMessages.findIndex((m) => m.id === tempAiMessage.id);
+          if (aiMsgIndex !== -1) {
+            newMessages[aiMsgIndex] = {
+              ...newMessages[aiMsgIndex],
+              content: newMessages[aiMsgIndex].content + chunk
+            };
+          }
+          return newMessages;
+        });
+      });
+
+      if (result) {
+        setActiveSessionId(result.session.id);
+        setMessages((current) => [
+          ...current.filter((item) => item.id !== tempUserMessage.id && item.id !== tempAiMessage.id),
+          ...result.messages,
+        ]);
+        await loadSessions();
+      }
     } catch (error) {
-      setMessages((current) => current.filter((item) => item.id !== tempUserMessage.id));
+      setMessages((current) => current.filter((item) => item.id !== tempUserMessage.id && item.id !== tempAiMessage.id));
       toast.error(error instanceof Error ? error.message : 'Không thể gửi tin nhắn');
     } finally {
       setSending(false);
@@ -322,7 +346,15 @@ export function ChatPage() {
                         ? 'bg-zinc-800 text-white border border-white/5 shadow-sm'
                         : 'bg-zinc-950/60 border border-white/5 text-stone-300'}`}
                     >
-                      <FormattedMessage content={displayContent.trim()} />
+                      {displayContent.trim() ? (
+                        <FormattedMessage content={displayContent.trim()} />
+                      ) : (
+                        <div className="flex items-center gap-1.5 h-5 py-1">
+                          <span className="w-1.5 h-1.5 bg-stone-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <span className="w-1.5 h-1.5 bg-stone-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <span className="w-1.5 h-1.5 bg-stone-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                        </div>
+                      )}
                       <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5 text-[9px] text-stone-500">
                         <span>{isUser ? 'USER' : 'ASSISTANT'}</span>
                         <span>{formatTime(message.createdAt)}</span>
@@ -343,21 +375,6 @@ export function ChatPage() {
                   <p className="text-[10px] text-stone-500 font-mono mt-1">
                     Ask questions about your codebase, APIs, databases or deployment steps.
                   </p>
-                </div>
-              </div>
-            </div>
-          )}
-          {sending && (
-            <div className="flex justify-start">
-              <div className="bg-zinc-950/60 border border-white/5 text-stone-300 rounded-xl px-4 py-3 text-xs tracking-wide leading-relaxed font-mono">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-spin" />
-                  <span className="text-stone-400">AI đang suy nghĩ</span>
-                  <span className="flex gap-1 ml-1">
-                    <span className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <span className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <span className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                  </span>
                 </div>
               </div>
             </div>

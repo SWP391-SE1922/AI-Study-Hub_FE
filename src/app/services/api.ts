@@ -611,17 +611,99 @@ export async function sendChatMessage(message: string, sessionId?: string | null
   return result.data;
 }
 
+export async function streamChatMessage(
+  message: string,
+  sessionId: string | null | undefined,
+  onChunk: (text: string) => void
+) {
+  const token = getToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}/ai/chat-stream`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ message, sessionId }),
+  });
+
+  if (!response.ok) {
+    const errorPayload = await response.json().catch(() => null);
+    throw new Error(errorPayload?.message || `Lỗi API ${response.status}`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('Không thể đọc luồng dữ liệu');
+
+  const decoder = new TextDecoder('utf-8');
+  let finalResult = null;
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+
+    buffer = lines.pop() || ''; // Keep the incomplete line in buffer
+
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const dataText = line.substring(6).trim();
+        if (dataText === '[DONE]') continue;
+
+        try {
+          const parsed = JSON.parse(dataText);
+          if (parsed.text) {
+            onChunk(parsed.text);
+          } else if (parsed.done) {
+            finalResult = parsed;
+          }
+        } catch (e) {
+          // ignore parsing error for partial chunks if any
+        }
+      }
+    }
+  }
+
+  return finalResult as { session: ChatSession; messages: ChatMessage[] } | null;
+}
+
 export async function deleteChatSession(sessionId: string) {
   const response = await fetch(`${API_BASE_URL}/ai/sessions/${sessionId}`, {
     method: 'DELETE',
-    headers: buildHeaders(),
+    headers: {
+      Authorization: `Bearer ${getToken()}`,
+    },
   });
-
-  if (!response.ok && response.status !== 204) {
-    const payload = await response.json().catch(() => null);
-    throw new Error(payload?.message || `Lỗi API ${response.status}`);
+  if (!response.ok) {
+    const errorPayload = await response.json().catch(() => null);
+    throw new Error(errorPayload?.message || 'Lỗi xóa phiên chat');
   }
 }
+
+// System Settings
+export async function getPublicSettings() {
+  const response = await fetch(`${API_BASE_URL}/settings/public`, {
+    headers: { 'ngrok-skip-browser-warning': 'true' }
+  });
+  const result = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(result?.message || 'Lỗi API lấy cấu hình');
+  return result?.data || { maxUploadSize: 10485760 };
+}
+
+export async function updateSystemSettings(maxUploadSize: number) {
+  const result = await request<ApiResponse<any>>('/settings', {
+    method: 'PUT',
+    body: JSON.stringify({ maxUploadSize }),
+  });
+  return result.data;
+}
+
 // Thêm vào cuối file api.ts của bạn
 
 export async function getPublicDocuments(params: Record<string, string | number | undefined> = {}) {
